@@ -1,6 +1,8 @@
 """Модуль кастомного клиента"""
 
-from typing import Optional
+import datetime
+import logging
+from typing import Any, Optional, Coroutine
 
 from pyrogram.client import Client
 
@@ -15,6 +17,14 @@ class CustomClient(Client):
         api_hash: Optional[str] = None,
         bot_token: Optional[str] = None,
     ):
+        self.logger = logging.getLogger("pyrobot")
+        if not self.check_args(api_id, api_hash, name, bot_token):
+            return
+        logging.info("Проверка аргументов прошла успешно")
+        super().__init__(name, api_id, api_hash)
+
+    def check_args(self, api_id, api_hash, name, bot_token):
+        """Проверка аргументов"""
         if (api_id is None) or (api_hash is None):
             raise ValueError(
                 """В .env файле нужно указать api_id и api_hash 
@@ -42,4 +52,9 @@ class CustomClient(Client):
                                 BOT_TOKEN = 0123456789abcdef0123456789abcdef
                              """
             )
-        super().__init__(name, api_id, api_hash)
+        return True
+
+    def run(self, coroutine: Optional[Coroutine[Any, Any, Any]] = None) -> None:
+        """Запуск клиента"""
+        self.logger.info(f"Старт бота в {datetime.datetime.now(datetime.UTC)}")
+        super().run(coroutine)
