@@ -7,6 +7,7 @@ from pyrogram.client import Client
 
 class CustomClient(Client):
     """Кастомный класс клиента"""
+
     def __init__(
         self,
         name: str | None = "bot",
@@ -18,18 +19,18 @@ class CustomClient(Client):
             raise ValueError(
                 """В .env файле нужно указать api_id и api_hash 
                                 
-                                Пример:
+                   Пример:
                                 API_ID = 12345678 
                                 API_HASH = 0123456789abcdef0123456789abcdef
                                 
-                                Их можно получить в `https://my.telegram.org/apps`
+                   Их можно получить в `https://my.telegram.org/apps`
                              """
             )
         if name is None:
             raise ValueError(
                 """В .env файле нужно указать имя сессии
                                 
-                                Пример:
+                   Пример:
                                 NAME = ИМЯ_БОТА
                              """
             )
@@ -37,7 +38,7 @@ class CustomClient(Client):
             raise ValueError(
                 """В .env файле нужно указать токен бота
                                 
-                                Пример:
+                   Пример:
                                 BOT_TOKEN = 0123456789abcdef0123456789abcdef
                              """
             )
