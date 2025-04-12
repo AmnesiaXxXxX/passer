@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 from classes.client import CustomClient as Client
 
 logging.basicConfig(level=logging.INFO)
-load_dotenv()
+logging.getLogger("tinkoff_acquiring.client").level = logging.ERROR
+
+load_dotenv(override=True)
 NAME = os.getenv("NAME", None)
 API_ID = os.getenv("API_ID", None)
 API_HASH = os.getenv("API_HASH", None)
