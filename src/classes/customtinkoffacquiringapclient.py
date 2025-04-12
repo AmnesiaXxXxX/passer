@@ -32,7 +32,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
                     if state == "REJECTED":
                         return False
                     if state == "FORM_SHOWED":
-                        timeout = 1
+                        timeout = 240
             except TinkoffAPIException:
                 pass
             except asyncio.CancelledError:
