@@ -23,7 +23,7 @@ class Buttons_Menu(Enum):
         ]
 
         # Разбиваем кнопки на группы по 3
-        button_rows = [buttons[:3]]
+        button_rows = [buttons[i:i+1] for i in range(0, len(buttons), 1)]
 
         # Добавляем кнопку соглашения в последний ряд
         button_rows.append(
