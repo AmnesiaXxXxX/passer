@@ -16,14 +16,14 @@ class Buttons_Menu(Enum):
         # Создаем список всех кнопок
         buttons = [
             InlineKeyboardButton(
-                f"{date[0]} {'✅' if user(tg_id, date[0]) else '❌'}",
+                f"{date[0]} {db.get_available_slots(date[0])} {'✅' if user(tg_id, date[0]) else '❌'}",
                 f"reg_user_to_{date[0]}",
             )
             for date in db.get_events()
         ]
 
         # Разбиваем кнопки на группы по 3
-        button_rows = [buttons[i:i+1] for i in range(0, len(buttons), 1)]
+        button_rows = [buttons[i : i + 1] for i in range(0, len(buttons), 1)]
 
         # Добавляем кнопку соглашения в последний ряд
         button_rows.append(

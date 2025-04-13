@@ -131,6 +131,17 @@ class Database:
             print(f"Ошибка при деактивации посетителя: {e}")
             return False
 
+    def get_available_slots(self, date: datetime) -> int:
+        """Возвращает количество оставшихся свободных мест для указанного события."""
+        query = """
+            SELECT (max_visitors - visitors_count) AS available_slots
+            FROM registrations
+            WHERE date = ?
+        """
+        self.cur.execute(query, (date.date(),))
+        result = self.cur.fetchone()
+        return result[0] if result else 0
+
     def check_registration_by_hash(self, hash_code: str, is_active: bool = False):
         query = "SELECT * FROM visitors WHERE hash_code = ?"
         if is_active:
