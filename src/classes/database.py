@@ -131,14 +131,14 @@ class Database:
             print(f"Ошибка при деактивации посетителя: {e}")
             return False
 
-    def get_available_slots(self, date: datetime) -> int:
+    def get_available_slots(self, date: str) -> int:
         """Возвращает количество оставшихся свободных мест для указанного события."""
         query = """
             SELECT (max_visitors - visitors_count) AS available_slots
             FROM registrations
             WHERE date = ?
         """
-        self.cur.execute(query, (date.date(),))
+        self.cur.execute(query, (date,))
         result = self.cur.fetchone()
         return result[0] if result else 0
 
@@ -164,9 +164,9 @@ class Database:
 
         return len(self.cur.fetchall()) > 0
 
-    def get_events(self, display_full: bool = False):
+    def get_events(self, display_all: bool = False):
         query = "SELECT * FROM registrations"
-        if not display_full:
+        if not display_all:
             query += " WHERE visitors_count < max_visitors"
         self.cur.execute(query)
 

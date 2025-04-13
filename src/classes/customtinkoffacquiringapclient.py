@@ -1,8 +1,7 @@
 import asyncio
 import time
 
-from tinkoff_acquiring.client import (TinkoffAcquiringAPIClient,
-                                      TinkoffAPIException)
+from tinkoff_acquiring.client import TinkoffAcquiringAPIClient, TinkoffAPIException
 
 
 class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
