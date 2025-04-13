@@ -2,7 +2,7 @@
 
 import hashlib
 import sqlite3 as sql
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import List, Optional
 
 
@@ -152,7 +152,7 @@ class Database:
         else:
             return False
 
-    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime):
+    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime | date):
         query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
         self.cur.execute(
             query,

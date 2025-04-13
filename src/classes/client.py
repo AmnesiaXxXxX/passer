@@ -6,7 +6,9 @@ import io
 import logging
 import os
 import time
+from hashlib import sha256
 from typing import Any, Callable, Coroutine, List, Optional, Tuple
+from unittest.util import strclass
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -30,7 +32,6 @@ class CustomClient(Client):
         api_hash: Optional[str] = None,
         bot_token: Optional[str] = None,
     ):
-        global print
         self.logger = logging.getLogger("pyrobot")
         self.db = Database()
         self.tb = CustomTinkoffAcquiringAPIClient(
@@ -39,7 +40,6 @@ class CustomClient(Client):
 
         if not self.check_args(api_id, api_hash, name, bot_token):
             return
-        print = self.logger.info
         logging.info("Проверка аргументов прошла успешно")
 
         assert name is not None, "name must not be None"
@@ -104,13 +104,7 @@ class CustomClient(Client):
                 if "admin" in commands:
                     commands.remove("admin")
                     _filters = _filters & filters.user(Utils.ADMIN_IDS)
-                self.logger.info(commands)
                 self.add_handler(MessageHandler(func, _filters))
-
-        self.logger.info(
-            "Найдены асинхронные функции: \n%s",
-            "\n".join([name for name, _ in self_functions]),
-        )
 
     async def handle_check_admin(self, message: Message):
         if self.db.check_registration_by_hash(message.command[1], is_active=True):
@@ -123,7 +117,6 @@ class CustomClient(Client):
 
     async def handle_main_start(self, message: Message):
         """Главная функция для команд `main|start|help`"""
-        print(message.from_user.id)
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             try:
@@ -218,7 +211,6 @@ class CustomClient(Client):
             )
 
             result = self.db.check_registration_by_tgid(query.from_user.id, date.date())
-            print(f"Результат: {result}")
             if result:
                 await query.answer("❌ Вы уже зарегистрированы на это событие!!!")
                 return
@@ -226,10 +218,20 @@ class CustomClient(Client):
                 await query.answer("❌ Это событие закончилось или места кончились")
                 return
             cost = Utils.COST
+            description = "Оплата прохода в клуб"
+            # receipt: dict[str, str] = {
+            #     "Email": "stutututuf@gmail.com",
+            #     "Phone": "+79602051271",
+            #     "Amount": str(cost * 100),
+            #     "Description": description,
+            # }
+            # token = sha256("".join(receipt).encode()).hexdigest()
+            # receipt["Token"] = token
             r = await self.tb.init_payment(
                 cost,
                 hash(query.from_user.id + time.time()),
-                "Оплата прохода в клуб",
+                description,
+                # receipt=receipt,
             )
 
             await message.edit_text(

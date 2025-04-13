@@ -38,10 +38,3 @@ def setup_logging():
     error_file_handler.setFormatter(formatter)
     error_file_handler.setLevel(logging.ERROR)
     root_logger.addHandler(error_file_handler)
-
-    # Для библиотек можно настроить отдельные файлы
-    sql_logger = logging.getLogger("sqlalchemy")
-    sql_logger.addHandler(file_handler)
-
-    aio_logger = logging.getLogger("aiohttp")
-    aio_logger.addHandler(file_handler)
