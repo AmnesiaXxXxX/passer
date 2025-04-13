@@ -13,9 +13,14 @@ class Buttons_Menu(Enum):
             [
                 [
                     InlineKeyboardButton(
-                        f"Купить билет на {date[0]}", f"reg_user_to_{date[0]}"
+                        f"Дискотека '{date[0]}'", f"reg_user_to_{date[0]}"
                     )
                     for date in DB.get_events()
+                ],
+                [
+                    InlineKeyboardButton(
+                        "📝Пользовательское соглашение", "useragreement"
+                    )
                 ],
             ]
         ),
@@ -27,14 +32,12 @@ class Buttons_Menu(Enum):
 
     @classmethod
     def get_payment_button(cls, payment_url: str, cost: int):
-        return (
-            InlineKeyboardMarkup(
+        return InlineKeyboardMarkup(
+            [
                 [
-                    [
-                        InlineKeyboardButton(
-                            f"Оплатить с помощью Т-Банк ({cost} р.)", url=payment_url
-                        )
-                    ],
-                ]
-            )
+                    InlineKeyboardButton(
+                        f"Оплатить с помощью Т-Банк ({cost} р.)", url=payment_url
+                    )
+                ],
+            ]
         )
