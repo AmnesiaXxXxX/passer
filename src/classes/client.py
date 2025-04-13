@@ -119,7 +119,6 @@ class CustomClient(Client):
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             user = self.db.get_all_visitors(args[0])
-            print(user)
             if user:
                 self.db.delete_visitor(
                     user[0], datetime.datetime.strptime(user[1], "%Y-%d-%m %H:%M:%S")
