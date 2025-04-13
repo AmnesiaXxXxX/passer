@@ -5,8 +5,6 @@ import sqlite3 as sql
 from datetime import UTC, datetime
 from typing import List, Optional
 
-from utils import Utils
-
 
 class Database:
     def __init__(self, name: str = "database"):
@@ -37,7 +35,7 @@ class Database:
         """
         )
 
-    def get_all_visitors(self, q: Optional[str | int] = None) -> List[str]:
+    def get_all_visitors(self, q: Optional[str | int | datetime] = None) -> List[str]:
         query = "SELECT * FROM visitors"
         if q:
             query += (
@@ -61,24 +59,27 @@ class Database:
         entry_datetime: Optional[datetime] = None,
     ):
         for event in self.get_all_visitors(tg_id):
-            print(
-                (
-                    datetime.strptime(event[1], "%Y-%d-%m %H:%M:%S"),
-                    to_datetime.strftime(Utils.DATE_FORMAT),
-                )
-            )
+            # Try parsing with date first, then datetime if that fails
+            try:
+                event_datetime = datetime.strptime(event[1], "%Y-%m-%d")  # Date only
+            except ValueError:
+                try:
+                    event_datetime = datetime.strptime(event[1], "%Y-%m-%d %H:%M:%S")
+                except ValueError as e:
+                    raise ValueError(
+                        f"Could not parse datetime string: {event[1]}"
+                    ) from e
 
-            if datetime.strptime(event[1], "%Y-%d-%m %H:%M:%S") == to_datetime.strftime(
-                Utils.DATE_FORMAT
-            ):
+            if event_datetime.date() == to_datetime.date():
                 raise AttributeError(
                     "Такой пользователь уже зарегистрирован на это событие!"
                 )
+
         if entry_datetime is None:
             entry_datetime = datetime.now(UTC)
         hash_code = self.generate_hash(tg_id, entry_datetime)
         query = "INSERT INTO visitors (tg_id, to_datetime, hash_code) VALUES (?, ?, ?)"
-        self.cur.execute(query, (str(tg_id), to_datetime, hash_code))
+        self.cur.execute(query, (str(tg_id), to_datetime.date(), hash_code))
         return hash_code
 
     def delete_visitor(
@@ -130,15 +131,17 @@ class Database:
             print(f"Ошибка при деактивации посетителя: {e}")
             return False
 
-    def check_registration_by_hash(self, hash_code: str):
+    def check_registration_by_hash(self, hash_code: str, is_active: bool = False):
         query = "SELECT * FROM visitors WHERE hash_code = ?"
+        if is_active:
+            query += " AND is_active == 1"
         self.cur.execute(query, (hash_code,))
         if self.cur.fetchone():
             return True
         else:
             return False
 
-    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime | str):
+    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime):
         query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
         self.cur.execute(
             query,
@@ -147,13 +150,22 @@ class Database:
                 to_datetime,
             ),
         )
-        if self.cur.fetchone():
-            return True
-        else:
-            return False
 
-    def get_events(self):
+        return len(self.cur.fetchall()) > 0
+
+    def get_events(self, display_full: bool = False):
         query = "SELECT * FROM registrations"
+        if not display_full:
+            query += " WHERE visitors_count < max_visitors"
         self.cur.execute(query)
 
         return self.cur.fetchall()
+
+    def is_event_is_full(self, date: datetime):
+        query = "SELECT * FROM registrations WHERE visitors_count < max_visitors AND date == ?"
+        self.cur.execute(query, (str(date.date()),))
+        result = self.cur.fetchone()
+        print(date.date(), result)
+        if result:
+            return False
+        return True

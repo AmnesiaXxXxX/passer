@@ -12,7 +12,7 @@ from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
 from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.types import CallbackQuery, Message
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from classes.buttons_menu import Buttons_Menu
 from classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
@@ -113,15 +113,14 @@ class CustomClient(Client):
             "\n".join([name for name, _ in self_functions]),
         )
 
-    async def handle_checkhash(self, message: Message):
-        await message.reply(
-            f"Result: {self.db.check_registration_by_hash(message.command[1])}"
-        )
-
-    async def handle_checktgid(self, message: Message):
-        await message.reply(
-            f"Result: {self.db.check_registration_by_tgid(message.from_user.id, message.command[1])}"
-        )
+    async def handle_check_admin(self, message: Message):
+        if self.db.check_registration_by_hash(message.command[1], is_active=True):
+            await message.reply(Utils.TRUE_CODE)
+            self.db.disable_visitor(message.command[1])
+        elif self.db.check_registration_by_hash(message.command[1]):
+            await message.reply(Utils.FALSE_CODE_ALREADY_USED)
+        else:
+            await message.reply(Utils.FALSE_CODE)
 
     async def handle_main_start_help(self, message: Message):
         """Главная функция для команд `main|start|help`"""
@@ -131,18 +130,18 @@ class CustomClient(Client):
             try:
                 user = self.db.get_all_visitors(args[0])[0]
                 if user:
-                    if user[3]:
-                        await message.reply("`❌ Код уже был активирован!`")
-                    self.db.delete_visitor(
-                        user[0],
-                        user[1],
-                    )
-                    await message.reply("`✅ Код верный!`")
+                    if not user[3]:
+                        await message.reply(Utils.FALSE_CODE_ALREADY_USED)
+                        return
+                    self.db.disable_visitor(user[2])
+                    await message.reply(Utils.TRUE_CODE)
                     await message.delete()
             except IndexError:
-                await message.reply("`❌ Код неверный!`")
+                await message.reply(Utils.FALSE_CODE)
             return
-        await message.reply(Utils.START_MESSAGE, reply_markup=Buttons_Menu.get(0))
+        await message.reply(
+            Utils.START_MESSAGE, reply_markup=Buttons_Menu.get(message.from_user.id)
+        )
 
     async def handle_genqr_admin(self, message: Message):
         """Главная функция для команд `genqr`"""
@@ -156,14 +155,30 @@ class CustomClient(Client):
 
     async def callbacks(self, client: Client, query: CallbackQuery):
         data = str(query.data)
-        print(data)
+        message = query.message
+
         if data.startswith("useragreement"):
             msg = await client.send_message(
                 query.from_user.id,
                 """Пользовательское соглашение\n1. Общие положения\n1.1. Настоящее Пользовательское\nсоглашение (далее — «Соглашение») регулирует правила посещения дискотеки на базе Дома молодёжи (г. Боровичи, ул. 9 Января, д. 46) (далее —\n«Мероприятие»).\n1.2. Организатор оставляет за собой право вносить изменения в правила посещения и условия Соглашения.\nАктуальная версия всегда доступна на официальных ресурсах.\n1.3. Посещение Мероприятия означает согласие с условиями данного Соглашения.\n\n2. Условия посещения\n2.1. Мероприятие рекомендовано для лиц в возрасте от 14 до\n25 лет.\n2.2. Организатор в праве запросить предъявление документа, удостоверяющего возраст (паспорт, ученический билет с фото, справку из\nшколы).\n2.3. Вход строго запрещён лицам в состоянии алкогольного или наркотического опьянения\n\n3. Правила поведения\n3.1. Посетители обязаны:\n- Соблюдать общественный порядок и нормы морали.\n- Уважительно относиться к другим гостям и персоналу.\n- Выполнять требования администрации и охраны.\n3.2. Запрещено:\n- Употребление алкоголя, табака, наркотических веществ.\n- Ношение оружия, колюще-режущих предметов, взрывчатых\nвеществ.\n- Проявление агрессии, буллинга, дискриминации.\n- Порча имущества учреждения.\n3.3. В случае нарушений администрация вправе удалить посетителя без компенсации стоимости билета.\n\n4. Безопасность и контроль\n4.1. Организаторы проводят досмотр на входе для предотвращения проноса запрещённых предметов.\n4.2. В случае ЧП необходимо следовать указаниям\nперсонала.\n\n5. Ответственность\n5.1. Организатор не несёт ответственности за:\n- Личные вещи посетителей (рекомендуется не оставлять ценные вещи без присмотра).\n- Поведение посетителей вне территории Мероприятия.\n5.2. Родители/законные представители несовершеннолетних\nнесут ответственность за действия своих детей в рамках действующего законодательства.\n\n6. Прочие условия\n6.1. Организатор вправе использовать материалы с Мероприятия\nв рекламных целях.\n\n7. Условия использования кошелька\n7.1 Сумма, внесённая на счёт кошелька без весомой на то причины, не возвращается\n7.2 Возврат средств осуществляется на баланс кошелька исключительно при\nвозврате билета\n\nДата вступления в силу: 29.03.2025\nКонтакты организаторов:\nНиколаев Даниил Александрович\nstutututuf@gmail.com\nАжимиров Руслан Рамильевич\nazimirovr@mail.ru\nИванов Антон Андреевич\nmiiqwf@gmail.com""",
+                reply_markup=Buttons_Menu.get_menu_markup(),
             )
             return
+        if data.startswith("menu"):
+            await self.handle_main_start_help(message)
         if data.startswith("reg_user_to"):
+            date = datetime.datetime.strptime(
+                "".join(data.split("_")[3:]), Utils.DATE_FORMAT
+            )
+
+            result = self.db.check_registration_by_tgid(query.from_user.id, date.date())
+            print(f"Результат: {result}")
+            if result:
+                await query.answer("❌ Вы уже зарегистрированы на это событие!!!")
+                return
+            if self.db.is_event_is_full(date):
+                await query.answer("❌ Это событие закончилось или места кончились")
+                return
             cost = 200
             r = await self.tb.init_payment(
                 cost,
@@ -177,12 +192,17 @@ class CustomClient(Client):
                 reply_markup=Buttons_Menu.get_payment_button(r["PaymentURL"], cost),
             )
             if await self.tb.await_payment(r["PaymentId"]):
-                hash_code = self.db.reg_new_visitor(
-                    query.from_user.id,
-                    datetime.datetime.strptime(
-                        "".join(data.split("_")[3:]), Utils.DATE_FORMAT
-                    ),
-                )
+                try:
+                    hash_code = self.db.reg_new_visitor(
+                        query.from_user.id,
+                        date,
+                    )
+                except AttributeError:
+                    msg = await client.send_message(
+                        query.from_user.id,
+                        "`❌ Вы уже зарегистрированы на это событие!!!`",
+                    )
+                    return
                 msg = await client.send_message(
                     query.from_user.id, "Подождите, идёт генерация Вашего QR кода!"
                 )
@@ -192,10 +212,17 @@ class CustomClient(Client):
                 img_byte_arr = io.BytesIO()
                 image.save(img_byte_arr, format="PNG")
                 img_byte_arr.seek(0)
-                await msg.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
+                await msg.reply_photo(
+                    photo=img_byte_arr,
+                    caption=f"Ваш QR на дискотеку {"".join(data.split("_")[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                )
                 await client.delete_messages(chat_id=msg.chat.id, message_ids=msg.id)
             else:
-                await msg.edit_text("Оплата отклонена, попробуйте позже")
+                try:
+                    await msg.edit_text("Оплата отклонена, попробуйте позже")
+                except Exception:
+                    pass
+        await message.delete()
 
     def run(self, coroutine: Optional[Coroutine[Any, Any, Any]] = None) -> None:
         """Запуск клиента"""

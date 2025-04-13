@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
 def get_env_admin_ids() -> list[int | str]:
     # Получаем значение из переменной окружения или используем значение по умолчанию
     ids_str = os.getenv("ADMIN_IDS", "5957115070,831985431")
@@ -23,9 +22,15 @@ def get_env_admin_ids() -> list[int | str]:
 class Utils:
     """Класс утилит"""
 
-    START_MESSAGE: str = """**🔥Добро пожаловать в платёжного бота дискотеки S.T.A.R**🔥"""
-    DATE_FORMAT: str = "%d/%m/%Y, %H:%M:%S"
+    START_MESSAGE: str = (
+        """**🔥Добро пожаловать в платёжного бота дискотеки S.T.A.R**🔥"""
+    )
+    DATE_FORMAT: str = "%Y-%m-%d"
+    DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
     ADMIN_IDS: list[int | str] = get_env_admin_ids()
+    TRUE_CODE = "`✅ Код верный!`"
+    FALSE_CODE = "`❌ Код неверный!`"
+    FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
 
     @classmethod
     def updateAdminIDs(cls) -> None:
