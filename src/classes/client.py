@@ -12,7 +12,7 @@ from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
 from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from pyrogram.types import CallbackQuery, Message
 
 from classes.buttons_menu import Buttons_Menu
 from classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
@@ -179,7 +179,7 @@ class CustomClient(Client):
             if self.db.is_event_is_full(date):
                 await query.answer("❌ Это событие закончилось или места кончились")
                 return
-            cost = 200
+            cost = Utils.COST
             r = await self.tb.init_payment(
                 cost,
                 hash(query.from_user.id + time.time()),

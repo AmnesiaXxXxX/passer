@@ -31,7 +31,7 @@ class Utils:
     TRUE_CODE = "`✅ Код верный!`"
     FALSE_CODE = "`❌ Код неверный!`"
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
-
+    COST = 250
     @classmethod
     def updateAdminIDs(cls) -> None:
         # Обновляет список ADMIN_IDS из .env файла
