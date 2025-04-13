@@ -68,9 +68,9 @@ class Database:
                 )
             )
 
-            if datetime.strptime(
-                event[1], "%Y-%d-%m %H:%M:%S"
-            ) == to_datetime.strftime(Utils.DATE_FORMAT):
+            if datetime.strptime(event[1], "%Y-%d-%m %H:%M:%S") == to_datetime.strftime(
+                Utils.DATE_FORMAT
+            ):
                 raise AttributeError(
                     "Такой пользователь уже зарегистрирован на это событие!"
                 )
@@ -82,7 +82,7 @@ class Database:
         return hash_code
 
     def delete_visitor(
-        self, tg_id: int | str, to_datetime: Optional[datetime] = None
+        self, tg_id: int | str, to_datetime: Optional[datetime | str] = None
     ) -> None:
         """
         Удаляет пользователя из базы данных.
@@ -95,6 +95,62 @@ class Database:
         else:
             query = "DELETE FROM visitors WHERE tg_id=? AND to_datetime=?"
             self.cur.execute(query, (str(tg_id), to_datetime))
+
+    def disable_visitor(self, hash_code: str):
+        """Деактивирует посетителя по хеш-коду (устанавливает is_active = 0)"""
+        try:
+            # Обновляем запись посетителя
+            self.cur.execute(
+                "UPDATE visitors SET is_active = 0 WHERE hash_code = ?", (hash_code,)
+            )
+
+            # Получаем дату посетителя для обновления счетчика
+            self.cur.execute(
+                "SELECT to_datetime FROM visitors WHERE hash_code = ?", (hash_code,)
+            )
+            visitor_date = self.cur.fetchone()
+
+            if visitor_date:
+                # Обновляем счетчик в таблице registrations
+                self.cur.execute(
+                    """UPDATE registrations
+                    SET visitors_count = (
+                        SELECT COUNT(*)
+                        FROM visitors
+                        WHERE to_datetime = ? AND is_active = 1
+                    )
+                    WHERE date = ?""",
+                    (visitor_date[0], visitor_date[0]),
+                )
+
+            self.con.commit()
+            return True
+        except Exception as e:
+            self.con.rollback()
+            print(f"Ошибка при деактивации посетителя: {e}")
+            return False
+
+    def check_registration_by_hash(self, hash_code: str):
+        query = "SELECT * FROM visitors WHERE hash_code = ?"
+        self.cur.execute(query, (hash_code,))
+        if self.cur.fetchone():
+            return True
+        else:
+            return False
+
+    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime | str):
+        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
+        self.cur.execute(
+            query,
+            (
+                tg_id,
+                to_datetime,
+            ),
+        )
+        if self.cur.fetchone():
+            return True
+        else:
+            return False
 
     def get_events(self):
         query = "SELECT * FROM registrations"

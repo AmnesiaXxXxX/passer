@@ -25,7 +25,6 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
             try:
                 result = await self.get_payment_state(order_id)
                 state = result["Status"]
-                print(timeout)
                 if state:
                     if state == "CONFIRMED":
                         return True

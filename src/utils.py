@@ -23,7 +23,7 @@ def get_env_admin_ids() -> list[int | str]:
 class Utils:
     """Класс утилит"""
 
-    START_MESSAGE: str = """🔥Добро пожаловать в платёжного бота дискотеки **S.T.A.R**🔥"""
+    START_MESSAGE: str = """**🔥Добро пожаловать в платёжного бота дискотеки S.T.A.R**🔥"""
     DATE_FORMAT: str = "%d/%m/%Y, %H:%M:%S"
     ADMIN_IDS: list[int | str] = get_env_admin_ids()
 

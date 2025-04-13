@@ -113,20 +113,34 @@ class CustomClient(Client):
             "\n".join([name for name, _ in self_functions]),
         )
 
+    async def handle_checkhash(self, message: Message):
+        await message.reply(
+            f"Result: {self.db.check_registration_by_hash(message.command[1])}"
+        )
+
+    async def handle_checktgid(self, message: Message):
+        await message.reply(
+            f"Result: {self.db.check_registration_by_tgid(message.from_user.id, message.command[1])}"
+        )
+
     async def handle_main_start_help(self, message: Message):
         """Главная функция для команд `main|start|help`"""
         print(message.from_user.id)
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
-            user = self.db.get_all_visitors(args[0])[0]
-            if user:
-                self.db.delete_visitor(
-                    user[0], datetime.datetime.strptime(user[1], "%Y-%d-%m %H:%M:%S")
-                )
-                await message.reply("Код верный!")
-                await message.delete()
-            else:
-                await message.reply("Код неверный!")
+            try:
+                user = self.db.get_all_visitors(args[0])[0]
+                if user:
+                    if user[3]:
+                        await message.reply("`❌ Код уже был активирован!`")
+                    self.db.delete_visitor(
+                        user[0],
+                        user[1],
+                    )
+                    await message.reply("`✅ Код верный!`")
+                    await message.delete()
+            except IndexError:
+                await message.reply("`❌ Код неверный!`")
             return
         await message.reply(Utils.START_MESSAGE, reply_markup=Buttons_Menu.get(0))
 
