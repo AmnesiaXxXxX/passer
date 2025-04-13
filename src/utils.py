@@ -1,10 +1,22 @@
 """Утилиты для бота"""
 
 import asyncio
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import PIL
 import PIL.Image
 import qrcode
+
+
+def get_env_admin_ids() -> list[int | str]:
+    # Получаем значение из переменной окружения или используем значение по умолчанию
+    ids_str = os.getenv("ADMIN_IDS", "5957115070,831985431")
+    return [
+        int(x.strip()) if x.strip().isdigit() else x.strip() for x in ids_str.split(",")
+    ]
 
 
 class Utils:
@@ -14,7 +26,12 @@ class Utils:
         """Привет!\nЭтот бот нужен для оплаты пропуска на вечеринку \n"""
     )
     DATE_FORMAT: str = "%d/%m/%Y, %H:%M:%S"
-    ADMIN_IDS: list[int | str] = [5957115070]
+    ADMIN_IDS: list[int | str] = get_env_admin_ids()
+
+    @classmethod
+    def updateAdminIDs(cls) -> None:
+        # Обновляет список ADMIN_IDS из .env файла
+        cls.ADMIN_IDS = get_env_admin_ids()
 
     @staticmethod
     async def genQRCode(data: str | list[str]):
