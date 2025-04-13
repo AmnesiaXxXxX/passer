@@ -35,7 +35,7 @@ class Buttons_Menu(Enum):
 
         for date in db.get_events(display_all=True, show_old=False):
             available = db.get_available_slots(date[0])
-            button_text = f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')} ({available} {Buttons_Menu.decline_tickets(available)}) {'✅' if user(tg_id, date[0]) else '❌'}"
+            button_text = f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')} ({available} {Buttons_Menu.decline_tickets(available)}) {'✅' if user(tg_id, date[0]) else ''}
 
             button = InlineKeyboardButton(
                 button_text,
