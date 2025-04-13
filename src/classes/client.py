@@ -115,12 +115,16 @@ class CustomClient(Client):
 
     async def handle_main_start_help(self, message: Message):
         """Главная функция для команд `main|start|help`"""
+        print(message.from_user.id)
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             user = self.db.get_all_visitors(args[0])
             if user:
                 self.db.delete_visitor(user[0], user[1])
+                await message.reply("Код верный!")
                 await message.delete()
+            else:
+                await message.reply("Код неверный!")
             return
         await message.reply(Utils.START_MESSAGE, reply_markup=Buttons_Menu.get(0))
 
