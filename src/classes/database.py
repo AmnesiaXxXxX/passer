@@ -12,6 +12,30 @@ class Database:
     def __init__(self, name: str = "database"):
         self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
         self.cur = self.con.cursor()
+        self.create_tables()  # Добавлено: создание таблиц при старте
+
+    def create_tables(self):
+        # Создание таблицы visitors, если не существует
+        self.cur.execute(
+            """
+        CREATE TABLE IF NOT EXISTS visitors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id TEXT NOT NULL,
+            to_datetime TEXT NOT NULL,
+            hash_code TEXT NOT NULL
+        )
+        """
+        )
+        # Создание таблицы registrations, если не существует
+        self.cur.execute(
+            """
+        CREATE TABLE IF NOT EXISTS registrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id TEXT,
+            event_date TEXT
+        )
+        """
+        )
 
     def get_all_visitors(self, q: Optional[str | int] = None) -> List[str]:
         query = "SELECT * FROM visitors"
