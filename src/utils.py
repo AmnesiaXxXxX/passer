@@ -2,13 +2,14 @@
 
 import asyncio
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import PIL
 import PIL.Image
 import qrcode
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 
 def get_env_admin_ids() -> list[int | str]:
