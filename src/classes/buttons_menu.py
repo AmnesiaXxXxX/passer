@@ -44,9 +44,6 @@ class Buttons_Menu(Enum):
             buttons.append(button)
 
         buttons.append(Buttons_Menu.get_menu())
-            buttons.append(button)
-
-        buttons.append(Buttons_Menu.get_menu())
 
         # Разбиваем кнопки на группы по 3
         return InlineKeyboardMarkup(
@@ -81,8 +78,7 @@ class Buttons_Menu(Enum):
 
     @staticmethod
     def get_menu():
-        return InlineKeyboardButton("🗄 В меню", callback_data="menu")
-        return InlineKeyboardButton("🗄 В меню", callback_data="menu")
+        return InlineKeyboardButton("🗄 В меню", callback_data="open_menu")
 
     @staticmethod
     def get_menu_markup():
