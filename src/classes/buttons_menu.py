@@ -78,7 +78,7 @@ class Buttons_Menu(Enum):
 
     @staticmethod
     def get_menu():
-        return InlineKeyboardButton("🗄 В меню", callback_data="open_menu")
+        return InlineKeyboardButton("🗄 В меню", callback_data="menu")
 
     @staticmethod
     def get_menu_markup():
