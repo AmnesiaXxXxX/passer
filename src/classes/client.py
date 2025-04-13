@@ -42,7 +42,6 @@ class CustomClient(Client):
         print = self.logger.info
         logging.info("Проверка аргументов прошла успешно")
 
-        # trunk-ignore(bandit/B101)
         assert name is not None, "name must not be None"
         super().__init__(name, api_id, api_hash, bot_token=bot_token, workers=24)
         self.setup_handlers()
@@ -122,7 +121,7 @@ class CustomClient(Client):
         else:
             await message.reply(Utils.FALSE_CODE)
 
-    async def handle_main_start_help(self, message: Message):
+    async def handle_main_start(self, message: Message):
         """Главная функция для команд `main|start|help`"""
         print(message.from_user.id)
         args = message.command[1:]
@@ -140,8 +139,7 @@ class CustomClient(Client):
                 await message.reply(Utils.FALSE_CODE)
             return
         await message.reply(
-            Utils.START_MESSAGE,
-            reply_markup=Buttons_Menu.get_start_markup(),
+            Utils.START_MESSAGE, reply_markup=Buttons_Menu.get(message.from_user.id)
         )
 
     async def handle_genqr_admin(self, message: Message):
@@ -154,26 +152,58 @@ class CustomClient(Client):
         img_byte_arr.seek(0)
         await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
 
-    async def callbacks(self, client: Client, query: CallbackQuery):
+    @Utils.event_exception_handler
+    async def handle_addevent_admin(self, message: Message):
+        # await message.delete()
+        answer1 = await message.ask(
+            f"**Введите дату дискотеки в формате** `{Utils.DATE_FORMAT}`"
+        )
+        date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
+        answer2 = await message.ask(
+            "**Введите числом максимальное количество пользователей или напишите** `выход` **для окончания создания события(стандратное число 250)**"
+        )
+        max_visitors = (
+            int(answer2.content) if answer2.content.lower() != "выход" else 250
+        )
+        self.db.add_event(date, max_visitors)
+        self.logger.warning(
+            f"Пользователь {message.from_user.full_name}({message.from_user.id}) добавил ивент на {date}"
+        )
+
+    @Utils.event_exception_handler
+    async def handle_delevent_admin(self, message: Message):
+        # await message.delete()
+        text = ""
+        answer1 = await message.ask(
+            f"**Введите дату дискотеки которую хотите удалить в формате** `{Utils.DATE_FORMAT}` или напишите `выход` для отмены"
+        )
+        if answer1.content.lower() != "выход":
+            date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
+            self.db.delete_event(date)
+            text = f"**Событие** __{date}__ **успешно удалено!**"
+            self.logger.warning(
+                f"Пользователь {message.from_user.full_name}({message.from_user.id}) удалил ивент на {date}"
+            )
+        else:
+            text = "**Удаление события отменено!**"
+            self.logger.info(
+                f"Пользователь {message.from_user.full_name}({message.from_user.id}) отменил удаление ивента"
+            )
+        await answer1.reply(text)
+
+    async def callbacks(self, _: Client, query: CallbackQuery):
         data = str(query.data)
         message = query.message
 
         if data.startswith("useragreement"):
-            await message.edit_text(
+            msg = await client.send_message(
+                query.from_user.id,
                 """Пользовательское соглашение\n1. Общие положения\n1.1. Настоящее Пользовательское\nсоглашение (далее — «Соглашение») регулирует правила посещения дискотеки на базе Дома молодёжи (г. Боровичи, ул. 9 Января, д. 46) (далее —\n«Мероприятие»).\n1.2. Организатор оставляет за собой право вносить изменения в правила посещения и условия Соглашения.\nАктуальная версия всегда доступна на официальных ресурсах.\n1.3. Посещение Мероприятия означает согласие с условиями данного Соглашения.\n\n2. Условия посещения\n2.1. Мероприятие рекомендовано для лиц в возрасте от 14 до\n25 лет.\n2.2. Организатор в праве запросить предъявление документа, удостоверяющего возраст (паспорт, ученический билет с фото, справку из\nшколы).\n2.3. Вход строго запрещён лицам в состоянии алкогольного или наркотического опьянения\n\n3. Правила поведения\n3.1. Посетители обязаны:\n- Соблюдать общественный порядок и нормы морали.\n- Уважительно относиться к другим гостям и персоналу.\n- Выполнять требования администрации и охраны.\n3.2. Запрещено:\n- Употребление алкоголя, табака, наркотических веществ.\n- Ношение оружия, колюще-режущих предметов, взрывчатых\nвеществ.\n- Проявление агрессии, буллинга, дискриминации.\n- Порча имущества учреждения.\n3.3. В случае нарушений администрация вправе удалить посетителя без компенсации стоимости билета.\n\n4. Безопасность и контроль\n4.1. Организаторы проводят досмотр на входе для предотвращения проноса запрещённых предметов.\n4.2. В случае ЧП необходимо следовать указаниям\nперсонала.\n\n5. Ответственность\n5.1. Организатор не несёт ответственности за:\n- Личные вещи посетителей (рекомендуется не оставлять ценные вещи без присмотра).\n- Поведение посетителей вне территории Мероприятия.\n5.2. Родители/законные представители несовершеннолетних\nнесут ответственность за действия своих детей в рамках действующего законодательства.\n\n6. Прочие условия\n6.1. Организатор вправе использовать материалы с Мероприятия\nв рекламных целях.\n\n7. Условия использования кошелька\n7.1 Сумма, внесённая на счёт кошелька без весомой на то причины, не возвращается\n7.2 Возврат средств осуществляется на баланс кошелька исключительно при\nвозврате билета\n\nДата вступления в силу: 29.03.2025\nКонтакты организаторов:\nНиколаев Даниил Александрович\nstutututuf@gmail.com\nАжимиров Руслан Рамильевич\nazimirovr@mail.ru\nИванов Антон Андреевич\nmiiqwf@gmail.com""",
                 reply_markup=Buttons_Menu.get_menu_markup(),
             )
             return
-        if data.startswith("reg_error"):
-            await query.answer("❌ Это событие закончилось или места кончились")
-        if data.startswith("buytickets"):
-            await message.edit_reply_markup(
-                Buttons_Menu.get_buy_markup(query.from_user.id)
-            )
         if data.startswith("menu"):
-            await message.edit_text(Utils.START_MESSAGE)
-            await message.edit_reply_markup(Buttons_Menu.get_start_markup())
-
+            await self.handle_main_start_help(message)
         if data.startswith("reg_user_to"):
             date = datetime.datetime.strptime(
                 "".join(data.split("_")[3:]), Utils.DATE_FORMAT
@@ -194,11 +224,15 @@ class CustomClient(Client):
                 "Оплата прохода в клуб",
             )
 
-            await message.edit_text(
+            msg = await client.send_message(
+                query.from_user.id,
                 "Виды оплаты",
                 reply_markup=Buttons_Menu.get_payment_button(r["PaymentURL"], cost),
             )
             if await self.tb.await_payment(r["PaymentId"]):
+                self.logger.info(
+                    f"Пользователь {message.from_user.full_name}({message.from_user.id}) оплатил заказ {r['PaymentId']}"
+                )
                 try:
                     hash_code = self.db.reg_new_visitor(
                         query.from_user.id,
@@ -218,11 +252,14 @@ class CustomClient(Client):
                 img_byte_arr.seek(0)
                 await message.reply_photo(
                     photo=img_byte_arr,
-                    caption=f"Ваш QR на дискотеку {"".join(data.split("_")[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                    caption=f"Ваш QR на дискотеку {''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                )
+                self.logger.info(
+                    f"Пользователь {message.from_user.full_name}({message.from_user.id}) получил код {hash_code}"
                 )
             else:
                 try:
-                    await message.edit_text("Оплата отклонена, попробуйте позже")
+                    await msg.edit_text("Оплата отклонена, попробуйте позже")
                 except Exception:
                     pass
 

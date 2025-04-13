@@ -1,13 +1,13 @@
+from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from classes.database import Database
+from utils import Utils
 
 
 class Buttons_Menu(Enum):
-
     @staticmethod
     def decline_tickets(number: int) -> str:
         """
@@ -33,14 +33,17 @@ class Buttons_Menu(Enum):
         user = db.check_registration_by_tgid
         buttons = []
 
-        for date in db.get_events(display_all=True):
+        for date in db.get_events(display_all=True, show_old=False):
             available = db.get_available_slots(date[0])
-            button_text = f"{date[0]} ({available} {Buttons_Menu.decline_tickets(available)}) {'✅' if user(tg_id, date[0]) else '❌'}"
+            button_text = f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')} ({available} {Buttons_Menu.decline_tickets(available)}) {'✅' if user(tg_id, date[0]) else '❌'}"
 
             button = InlineKeyboardButton(
                 button_text,
                 f"reg_user_to_{date[0]}" if date[2] - date[1] > 0 else "reg_error",
             )
+            buttons.append(button)
+
+        buttons.append(Buttons_Menu.get_menu())
             buttons.append(button)
 
         buttons.append(Buttons_Menu.get_menu())
@@ -51,7 +54,7 @@ class Buttons_Menu(Enum):
         )
 
     @classmethod
-    def get_start_markup(cls) -> Optional[InlineKeyboardMarkup]:
+    def get_start_markup(cls) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Купить билеты", "buytickets")],
@@ -78,6 +81,7 @@ class Buttons_Menu(Enum):
 
     @staticmethod
     def get_menu():
+        return InlineKeyboardButton("🗄 В меню", callback_data="menu")
         return InlineKeyboardButton("🗄 В меню", callback_data="menu")
 
     @staticmethod

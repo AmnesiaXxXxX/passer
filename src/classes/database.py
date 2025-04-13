@@ -164,12 +164,21 @@ class Database:
 
         return len(self.cur.fetchall()) > 0
 
-    def get_events(self, display_all: bool = False):
+    def get_events(self, display_all: bool = False, show_old: bool = True):
         query = "SELECT * FROM registrations"
-        if not display_all:
-            query += " WHERE visitors_count < max_visitors"
-        self.cur.execute(query)
+        conditions = []
 
+        if not display_all:
+            conditions.append("visitors_count < max_visitors")
+        if not show_old:
+            conditions.append("date(date, '+1 day') > date('now', 'localtime')")
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY date ASC"  # Добавляем сортировку по дате
+
+        self.cur.execute(query)
         return self.cur.fetchall()
 
     def is_event_is_full(self, date: datetime):
@@ -180,3 +189,24 @@ class Database:
         if result:
             return False
         return True
+
+    def add_event(self, date: datetime, max_visitors: int) -> None:
+        """Добавляет или обновляет событие в расписании."""
+        query = """
+            INSERT INTO registrations (date, max_visitors, visitors_count)
+            VALUES (?, ?, 0)
+            ON CONFLICT(date) DO UPDATE SET
+                max_visitors = excluded.max_visitors
+        """
+        self.cur.execute(query, (date.date().isoformat(), max_visitors))
+        self.con.commit()
+
+    def delete_event(self, date: datetime) -> None:
+        """Полностью удаляет событие и связанные регистрации."""
+        date_str = date.date().isoformat()
+
+        # Удаляем связанных посетителей
+        self.cur.execute("DELETE FROM visitors WHERE to_datetime = ?", (date_str,))
+        # Удаляем само событие
+        self.cur.execute("DELETE FROM registrations WHERE date = ?", (date_str,))
+        self.con.commit()
