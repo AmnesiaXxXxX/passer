@@ -6,9 +6,7 @@ import io
 import logging
 import os
 import time
-from hashlib import sha256
 from typing import Any, Callable, Coroutine, List, Optional, Tuple
-from unittest.util import strclass
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -16,10 +14,10 @@ from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
 from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import CallbackQuery, Message
 
-from classes.buttons_menu import Buttons_Menu
-from classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
-from classes.database import Database
-from utils import Utils
+from src.classes.buttons_menu import ButtonsMenu
+from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
+from src.classes.database import Database
+from src.utils import Utils
 
 
 class CustomClient(Client):
@@ -27,7 +25,7 @@ class CustomClient(Client):
 
     def __init__(
         self,
-        name: Optional[str] = "bot",
+        name: str = "bot",
         api_id: Optional[str | int] = None,
         api_hash: Optional[str] = None,
         bot_token: Optional[str] = None,
@@ -42,8 +40,13 @@ class CustomClient(Client):
             return
         logging.info("Проверка аргументов прошла успешно")
 
-        assert name is not None, "name must not be None"
-        super().__init__(name, api_id, api_hash, bot_token=bot_token, workers=24)
+        super().__init__(
+            name,
+            api_id,
+            api_hash,
+            bot_token=bot_token,
+            workers=24,
+        )
         self.setup_handlers()
         self.setup_callbacks()
 
@@ -56,7 +59,8 @@ class CustomClient(Client):
     ) -> bool:
         """Проверка аргументов.
 
-        Если один или несколько обязательных параметров отсутствуют, возбуждается ValueError с перечислением недостающих параметров.
+        Если один или несколько обязательных параметров отсутствуют,
+        возбуждается ValueError с перечислением недостающих параметров.
         """
         missing_params: List[str] = []
         if api_id is None:
@@ -82,6 +86,8 @@ class CustomClient(Client):
         return True
 
     def get_functions(self):
+        """Получение всех функций"""
+
         super_functions = [name for name, _ in super().__class__.__dict__.items()]
         self_functions: List[Tuple[str, Callable[..., Any]]] = [
             (name, func)
@@ -91,6 +97,7 @@ class CustomClient(Client):
         return super_functions, self_functions
 
     def setup_callbacks(self):
+        """Настройка прослушивания колбеков"""
         self.add_handler(CallbackQueryHandler(self.callbacks, filters.all))
 
     def setup_handlers(self):
@@ -107,6 +114,8 @@ class CustomClient(Client):
                 self.add_handler(MessageHandler(func, _filters))
 
     async def handle_check_admin(self, message: Message):
+        """Функция проверка кода"""
+
         if self.db.check_registration_by_hash(message.command[1], is_active=True):
             await message.reply(Utils.TRUE_CODE)
             self.db.disable_visitor(message.command[1])
@@ -133,13 +142,13 @@ class CustomClient(Client):
             return
         await message.reply(
             Utils.START_MESSAGE,
-            reply_markup=Buttons_Menu.get_start_markup(),
+            reply_markup=ButtonsMenu.get_start_markup(),
         )
 
     async def handle_genqr_admin(self, message: Message):
         """Главная функция для команд `genqr`"""
         msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
-        image = await Utils.genQRCode(message.command[1:])
+        image = await Utils.gen_qr_code(message.command[1:])
         await msg.delete()
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format="PNG")
@@ -148,62 +157,73 @@ class CustomClient(Client):
 
     @Utils.event_exception_handler
     async def handle_addevent_admin(self, message: Message):
+        """Функция добавления ивентов"""
+
         # await message.delete()
         answer1 = await message.ask(
             f"**Введите дату дискотеки в формате** `{Utils.DATE_FORMAT}`"
         )
         date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
         answer2 = await message.ask(
-            "**Введите числом максимальное количество пользователей или напишите** `выход` **для окончания создания события(стандратное число 250)**"
+            "**Введите числом максимальное количество пользователей или напишите**"
+            "`выход` **для окончания создания события(стандратное число 250)**"
         )
         max_visitors = (
             int(answer2.content) if answer2.content.lower() != "выход" else 250
         )
         self.db.add_event(date, max_visitors)
         self.logger.warning(
-            f"Пользователь {message.from_user.full_name}({message.from_user.id}) добавил ивент на {date}"
+            f"Пользователь {message.from_user.full_name}({message.from_user.id}) "
+            f"добавил ивент на {date}"
         )
 
     @Utils.event_exception_handler
     async def handle_delevent_admin(self, message: Message):
+        """Функция удаления ивентов"""
+
         # await message.delete()
         text = ""
         answer1 = await message.ask(
-            f"**Введите дату дискотеки которую хотите удалить в формате** `{Utils.DATE_FORMAT}` или напишите `выход` для отмены"
+            "**Введите дату дискотеки которую хотите удалить в формате**"
+            f"`{Utils.DATE_FORMAT}` или напишите `выход` для отмены"
         )
         if answer1.content.lower() != "выход":
             date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
             self.db.delete_event(date)
             text = f"**Событие** __{date}__ **успешно удалено!**"
             self.logger.warning(
-                f"Пользователь {message.from_user.full_name}({message.from_user.id}) удалил ивент на {date}"
+                f"Пользователь {message.from_user.full_name}"
+                f"({message.from_user.id}) удалил ивент на {date}"
             )
         else:
             text = "**Удаление события отменено!**"
             self.logger.info(
-                f"Пользователь {message.from_user.full_name}({message.from_user.id}) отменил удаление ивента"
+                "Пользователь %s (%s) отменил удаление ивента",
+                message.from_user.full_name,
+                message.from_user.id,
             )
         await answer1.reply(text)
 
     async def callbacks(self, _: Client, query: CallbackQuery):
+        """Функция приёма колбеков"""
         data = str(query.data)
         message = query.message
 
         if data.startswith("useragreement"):
             await message.edit_text(
                 """Пользовательское соглашение\n1. Общие положения\n1.1. Настоящее Пользовательское\nсоглашение (далее — «Соглашение») регулирует правила посещения дискотеки на базе Дома молодёжи (г. Боровичи, ул. 9 Января, д. 46) (далее —\n«Мероприятие»).\n1.2. Организатор оставляет за собой право вносить изменения в правила посещения и условия Соглашения.\nАктуальная версия всегда доступна на официальных ресурсах.\n1.3. Посещение Мероприятия означает согласие с условиями данного Соглашения.\n\n2. Условия посещения\n2.1. Мероприятие рекомендовано для лиц в возрасте от 14 до\n25 лет.\n2.2. Организатор в праве запросить предъявление документа, удостоверяющего возраст (паспорт, ученический билет с фото, справку из\nшколы).\n2.3. Вход строго запрещён лицам в состоянии алкогольного или наркотического опьянения\n\n3. Правила поведения\n3.1. Посетители обязаны:\n- Соблюдать общественный порядок и нормы морали.\n- Уважительно относиться к другим гостям и персоналу.\n- Выполнять требования администрации и охраны.\n3.2. Запрещено:\n- Употребление алкоголя, табака, наркотических веществ.\n- Ношение оружия, колюще-режущих предметов, взрывчатых\nвеществ.\n- Проявление агрессии, буллинга, дискриминации.\n- Порча имущества учреждения.\n3.3. В случае нарушений администрация вправе удалить посетителя без компенсации стоимости билета.\n\n4. Безопасность и контроль\n4.1. Организаторы проводят досмотр на входе для предотвращения проноса запрещённых предметов.\n4.2. В случае ЧП необходимо следовать указаниям\nперсонала.\n\n5. Ответственность\n5.1. Организатор не несёт ответственности за:\n- Личные вещи посетителей (рекомендуется не оставлять ценные вещи без присмотра).\n- Поведение посетителей вне территории Мероприятия.\n5.2. Родители/законные представители несовершеннолетних\nнесут ответственность за действия своих детей в рамках действующего законодательства.\n\n6. Прочие условия\n6.1. Организатор вправе использовать материалы с Мероприятия\nв рекламных целях.\n\n7. Условия использования кошелька\n7.1 Сумма, внесённая на счёт кошелька без весомой на то причины, не возвращается\n7.2 Возврат средств осуществляется на баланс кошелька исключительно при\nвозврате билета\n\nДата вступления в силу: 29.03.2025\nКонтакты организаторов:\nНиколаев Даниил Александрович\nstutututuf@gmail.com\nАжимиров Руслан Рамильевич\nazimirovr@mail.ru\nИванов Антон Андреевич\nmiiqwf@gmail.com""",
-                reply_markup=Buttons_Menu.get_menu_markup(),
+                reply_markup=ButtonsMenu.get_menu_markup(),
             )
             return
         if data.startswith("reg_error"):
             await query.answer("❌ Это событие закончилось или места кончились")
         if data.startswith("buytickets"):
             await message.edit_reply_markup(
-                Buttons_Menu.get_buy_markup(query.from_user.id)
+                ButtonsMenu.get_buy_markup(query.from_user.id)
             )
         if data.startswith("menu"):
             await message.edit_text(Utils.START_MESSAGE)
-            await message.edit_reply_markup(Buttons_Menu.get_start_markup())
+            await message.edit_reply_markup(ButtonsMenu.get_start_markup())
 
         if data.startswith("reg_user_to"):
             date = datetime.datetime.strptime(
@@ -236,11 +256,12 @@ class CustomClient(Client):
 
             await message.edit_text(
                 "Виды оплаты",
-                reply_markup=Buttons_Menu.get_payment_button(r["PaymentURL"], cost),
+                reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
             )
             if await self.tb.await_payment(r["PaymentId"]):
                 self.logger.info(
-                    f"Пользователь {message.from_user.full_name}({message.from_user.id}) оплатил заказ {r['PaymentId']}"
+                    f"Пользователь {message.from_user.full_name}({message.from_user.id})"
+                    f" оплатил заказ {r['PaymentId']}"
                 )
                 try:
                     hash_code = self.db.reg_new_visitor(
@@ -253,7 +274,7 @@ class CustomClient(Client):
                     )
                     return
                 await message.edit_text("Подождите, идёт генерация Вашего QR кода!")
-                image = await Utils.genQRCode(
+                image = await Utils.gen_qr_code(
                     f"https://t.me/{self.me.username}?start={hash_code}"
                 )
                 img_byte_arr = io.BytesIO()
@@ -261,15 +282,19 @@ class CustomClient(Client):
                 img_byte_arr.seek(0)
                 await message.reply_photo(
                     photo=img_byte_arr,
-                    caption=f"Ваш QR на дискотеку {''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                    caption=f"Ваш QR на дискотеку "
+                    f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
                 )
                 self.logger.info(
-                    f"Пользователь {message.from_user.full_name}({message.from_user.id}) получил код {hash_code}"
+                    "Пользователь %s (%s) получил код %s",
+                    message.from_user.full_name,
+                    message.from_user.id,
+                    hash_code,
                 )
             else:
                 try:
                     await message.edit_text("Оплата отклонена, попробуйте позже")
-                except Exception:
+                except ValueError:
                     pass
 
     def run(self, coroutine: Optional[Coroutine[Any, Any, Any]] = None) -> None:

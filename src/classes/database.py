@@ -7,12 +7,15 @@ from typing import List, Optional
 
 
 class Database:
+    """Класс базы данных"""
+
     def __init__(self, name: str = "database"):
         self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
         self.cur = self.con.cursor()
         self.create_tables()  # Добавлено: создание таблиц при старте
 
     def create_tables(self):
+        """Создание таблиц"""
         # Создание таблицы visitors, если не существует
         self.cur.execute(
             """
@@ -36,6 +39,8 @@ class Database:
         )
 
     def get_all_visitors(self, q: Optional[str | int | datetime] = None) -> List[str]:
+        """Возвращает всех пользователей либо пользователей по фильтру"""
+
         query = "SELECT * FROM visitors"
         if q:
             query += (
@@ -48,6 +53,7 @@ class Database:
 
     @staticmethod
     def generate_hash(tg_id: int | str, dt: datetime) -> str:
+        """Внутренняя функция генерация хеша"""
         data = f"{tg_id}{dt.isoformat()}"
         return hashlib.sha256(data.encode()).hexdigest()
 
@@ -58,6 +64,7 @@ class Database:
         *,
         entry_datetime: Optional[datetime] = None,
     ):
+        """Функция регистрации пользователя"""
         for event in self.get_all_visitors(tg_id):
             # Try parsing with date first, then datetime if that fails
             try:
@@ -126,33 +133,36 @@ class Database:
 
             self.con.commit()
             return True
-        except Exception as e:
+        except (ValueError, IndexError) as e:
             self.con.rollback()
             print(f"Ошибка при деактивации посетителя: {e}")
             return False
 
-    def get_available_slots(self, date: str) -> int:
+    def get_available_slots(self, to_datetime: str) -> int:
         """Возвращает количество оставшихся свободных мест для указанного события."""
         query = """
             SELECT (max_visitors - visitors_count) AS available_slots
             FROM registrations
             WHERE date = ?
         """
-        self.cur.execute(query, (date,))
+        self.cur.execute(query, (to_datetime,))
         result = self.cur.fetchone()
         return result[0] if result else 0
 
     def check_registration_by_hash(self, hash_code: str, is_active: bool = False):
+        """Проверка записан ли пользователь на ивент по хешу"""
         query = "SELECT * FROM visitors WHERE hash_code = ?"
         if is_active:
             query += " AND is_active == 1"
         self.cur.execute(query, (hash_code,))
-        if self.cur.fetchone():
+        if bool(self.cur.fetchone()):
             return True
-        else:
-            return False
+        return False
 
-    def check_registration_by_tgid(self, tg_id: int | str, to_datetime: datetime | date):
+    def check_registration_by_tgid(
+        self, tg_id: int | str, to_datetime: datetime | date
+    ):
+        """Проверка записан ли пользователь на ивент по тг айди"""
         query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
         self.cur.execute(
             query,
@@ -165,8 +175,9 @@ class Database:
         return len(self.cur.fetchall()) > 0
 
     def get_events(self, display_all: bool = False, show_old: bool = True):
+        """Функция получения всех ивентов"""
         query = "SELECT * FROM registrations"
-        conditions = []
+        conditions: list[str] = []
 
         if not display_all:
             conditions.append("visitors_count < max_visitors")
@@ -181,16 +192,17 @@ class Database:
         self.cur.execute(query)
         return self.cur.fetchall()
 
-    def is_event_is_full(self, date: datetime):
+    def is_event_is_full(self, to_datetime: datetime):
+        """По дате события возвращает полно ли оно или нет"""
         query = "SELECT * FROM registrations WHERE visitors_count < max_visitors AND date == ?"
-        self.cur.execute(query, (str(date.date()),))
+        self.cur.execute(query, (str(to_datetime.date()),))
         result = self.cur.fetchone()
-        print(date.date(), result)
+        print(to_datetime.date(), result)
         if result:
             return False
         return True
 
-    def add_event(self, date: datetime, max_visitors: int) -> None:
+    def add_event(self, to_datetime: datetime, max_visitors: int) -> None:
         """Добавляет или обновляет событие в расписании."""
         query = """
             INSERT INTO registrations (date, max_visitors, visitors_count)
@@ -198,12 +210,12 @@ class Database:
             ON CONFLICT(date) DO UPDATE SET
                 max_visitors = excluded.max_visitors
         """
-        self.cur.execute(query, (date.date().isoformat(), max_visitors))
+        self.cur.execute(query, (to_datetime.date().isoformat(), max_visitors))
         self.con.commit()
 
-    def delete_event(self, date: datetime) -> None:
+    def delete_event(self, to_datetime: datetime) -> None:
         """Полностью удаляет событие и связанные регистрации."""
-        date_str = date.date().isoformat()
+        date_str = to_datetime.date().isoformat()
 
         # Удаляем связанных посетителей
         self.cur.execute("DELETE FROM visitors WHERE to_datetime = ?", (date_str,))

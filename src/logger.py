@@ -1,9 +1,12 @@
+"""Модуль логгера"""
+
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
 def setup_logging():
+    """Метод для настройки логгера+"""
     # Создаем папку logs, если ее нет
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)

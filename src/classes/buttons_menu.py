@@ -1,13 +1,21 @@
+"""Модуль кнопок меню"""
+
+from typing import List, Union
 from datetime import datetime
-from enum import Enum
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButtonBuy,
+)
 
-from classes.database import Database
-from utils import Utils
+from src.classes.database import Database
+from src.utils import Utils
 
 
-class Buttons_Menu(Enum):
+class ButtonsMenu:
+    """Класс кнопок"""
+
     @staticmethod
     def decline_tickets(number: int) -> str:
         """
@@ -22,20 +30,24 @@ class Buttons_Menu(Enum):
         """
         if number % 10 == 1 and number % 100 != 11:
             return "билет"
-        elif 2 <= number % 10 <= 4 and (number % 100 < 10 or number % 100 >= 20):
+        if 2 <= number % 10 <= 4 and (number % 100 < 10 or number % 100 >= 20):
             return "билета"
-        else:
-            return "билетов"
+        return "билетов"
 
     @classmethod
     def get_buy_markup(cls, tg_id: int | str):
+        """Возвращает маркап кнопок для покупки"""
         db = Database()
         user = db.check_registration_by_tgid
-        buttons = []
+        buttons: List[Union[InlineKeyboardButton, InlineKeyboardButtonBuy]] = []
 
         for date in db.get_events(display_all=True, show_old=False):
             available = db.get_available_slots(date[0])
-            button_text = f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')} ({available} {Buttons_Menu.decline_tickets(available)}) {'✅' if user(tg_id, date[0]) else ''}"
+            button_text = (
+                f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')}"
+                f"({available} {ButtonsMenu.decline_tickets(available)})"
+                f"{'✅' if user(tg_id, date[0]) else ''}"
+            )
 
             button = InlineKeyboardButton(
                 button_text,
@@ -43,15 +55,14 @@ class Buttons_Menu(Enum):
             )
             buttons.append(button)
 
-        buttons.append(Buttons_Menu.get_menu())
-
+        buttons.append(ButtonsMenu.get_menu())
+        result = [buttons[i : i + 1] for i in range(0, len(buttons))]
         # Разбиваем кнопки на группы по 3
-        return InlineKeyboardMarkup(
-            [buttons[i : i + 1] for i in range(0, len(buttons))]
-        )
+        return InlineKeyboardMarkup(result)
 
     @classmethod
     def get_start_markup(cls) -> InlineKeyboardMarkup:
+        """Возвращает стартовый маркап с кнопками"""
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Купить билеты", "buytickets")],
@@ -65,6 +76,7 @@ class Buttons_Menu(Enum):
 
     @classmethod
     def get_payment_button(cls, payment_url: str, cost: int):
+        """Возвращает кнопку оплаты через Т-Банк"""
         return InlineKeyboardMarkup(
             [
                 [
@@ -72,14 +84,16 @@ class Buttons_Menu(Enum):
                         f"Оплатить с помощью Т-Банк ({cost} р.)", url=payment_url
                     )
                 ],
-                [Buttons_Menu.get_menu()],
+                [ButtonsMenu.get_menu()],
             ]
         )
 
     @staticmethod
     def get_menu():
+        """Возвращает кнопку меню"""
         return InlineKeyboardButton("🗄 В меню", callback_data="menu")
 
     @staticmethod
     def get_menu_markup():
-        return InlineKeyboardMarkup([[Buttons_Menu.get_menu()]])
+        """Возвращает маркап кнопок меню"""
+        return InlineKeyboardMarkup([[ButtonsMenu.get_menu()]])

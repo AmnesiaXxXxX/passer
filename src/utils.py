@@ -3,7 +3,7 @@
 import asyncio
 import os
 from datetime import datetime
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, cast
 
 import PIL
 import PIL.Image
@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 
 def get_env_admin_ids() -> list[int | str]:
-    # Получаем значение из переменной окружения или используем значение по умолчанию
+    """Получаем значение из переменной окружения или используем значение по умолчанию"""
     ids_str = os.getenv("ADMIN_IDS", "5957115070,831985431")
     return [
         int(x.strip()) if x.strip().isdigit() else x.strip() for x in ids_str.split(",")
@@ -38,33 +38,38 @@ class Utils:
     COST = 250
 
     @classmethod
-    def updateAdminIDs(cls) -> None:
-        # Обновляет список ADMIN_IDS из .env файла
+    def update_admin_ids(cls) -> None:
+        """Обновляет список ADMIN_IDS из .env файла"""
         cls.ADMIN_IDS = get_env_admin_ids()
 
     @staticmethod
     def event_exception_handler(func: Callable[..., T]) -> Callable[..., T]:
         """Декоратор для обработки исключений при работе с событиями"""
 
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             try:
                 return await func(*args, **kwargs)
             except ValueError:
-                # Ищем объект Message в аргументах
                 message = next((arg for arg in args if isinstance(arg, Message)), None)
                 if message:
                     date = datetime.now().strftime(Utils.DATE_FORMAT)
                     await message.reply(f"**Ошибка формата!** \nПример: `{date}`")
+                raise
             except Exception as e:
                 message = next((arg for arg in args if isinstance(arg, Message)), None)
                 if message:
                     await message.reply(f"⚠️ Произошла ошибка: {str(e)}")
                 raise
 
-        return wrapper
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+            return cast(T, async_wrapper(*args, **kwargs))
+
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        return sync_wrapper
 
     @staticmethod
-    async def genQRCode(data: str | list[str]):
+    async def gen_qr_code(data: str | list[str]):
         """Асинхронная генерация QR-кода.
 
         Args:

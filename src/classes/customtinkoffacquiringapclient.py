@@ -1,3 +1,4 @@
+"""Модуль кастомного класса клиента тинькоффа"""
 import asyncio
 import time
 
@@ -5,6 +6,7 @@ from tinkoff_acquiring.client import TinkoffAcquiringAPIClient, TinkoffAPIExcept
 
 
 class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
+    """Класс кастомного класса клиента тинькоффа"""
     def __init__(self, terminal_key: str | None, secret: str | None):
         if not (terminal_key, secret):
             raise ValueError("terminal_key и secret не могут быть пустыми")
