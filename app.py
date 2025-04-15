@@ -17,7 +17,6 @@ API_ID = os.getenv("API_ID", None)
 API_HASH = os.getenv("API_HASH", None)
 BOT_TOKEN = os.getenv("BOT_TOKEN", None)
 
-print(API_ID, API_HASH)
 app = Client(NAME, API_ID, API_HASH, BOT_TOKEN)
 
 
