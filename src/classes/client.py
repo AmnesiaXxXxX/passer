@@ -6,7 +6,8 @@ import io
 import logging
 import os
 import time
-from typing import Any, Callable, Coroutine, List, Optional, Tuple
+import traceback
+from typing import Any, Callable, List, Optional, Tuple
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -96,22 +97,38 @@ class CustomClient(Client):
         ]
         return super_functions, self_functions
 
+    def error_decorator(self, func: Callable) -> Callable:
+        """Декоратор для обработки ошибок"""
+
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                await self.error_handler(e, f"Ошибка в {func.__name__}")
+
+        return wrapper
+
     def setup_callbacks(self):
-        """Настройка прослушивания колбеков"""
-        self.add_handler(CallbackQueryHandler(self.callbacks, filters.all))
+        """Настройка прослушивания колбеков с обработкой ошибок"""
+        wrapped_callback = self.error_decorator(self.callbacks)
+        self.add_handler(CallbackQueryHandler(wrapped_callback, filters.all))
 
     def setup_handlers(self):
-        """Настройка хендлеров отслеживания сообщений"""
+        """Настройка хендлеров с автоматической обработкой ошибок"""
         _, self_functions = self.get_functions()
 
         for name, func in self_functions:
             if name.startswith("handle_"):
-                commands: list[str] = name[7:].split("_")
+                commands = name[7:].split("_")
                 _filters = filters.command(commands)
+
                 if "admin" in commands:
                     commands.remove("admin")
                     _filters = _filters & filters.user(Utils.ADMIN_IDS)
-                self.add_handler(MessageHandler(func, _filters))
+
+                # Оборачиваем обработчик в декоратор ошибок
+                wrapped_handler = self.error_decorator(func)
+                self.add_handler(MessageHandler(wrapped_handler, _filters))
 
     async def handle_check_admin(self, message: Message):
         """Функция проверка кода"""
@@ -155,7 +172,6 @@ class CustomClient(Client):
         img_byte_arr.seek(0)
         await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
 
-    @Utils.event_exception_handler
     async def handle_addevent_admin(self, message: Message):
         """Функция добавления ивентов"""
 
@@ -177,7 +193,6 @@ class CustomClient(Client):
             f"добавил ивент на {date}"
         )
 
-    @Utils.event_exception_handler
     async def handle_delevent_admin(self, message: Message):
         """Функция удаления ивентов"""
 
@@ -203,6 +218,28 @@ class CustomClient(Client):
                 message.from_user.id,
             )
         await answer1.reply(text)
+
+    async def error_handler(self, error: Exception, context: str = ""):
+        """Асинхронный обработчик ошибок"""
+        error_msg = f"⚠️ **Ошибка в боте** ⚠️\n\n"
+        if context:
+            error_msg += f"**Контекст:** `{context}`\n\n"
+        error_msg += f"**Тип ошибки:** `{type(error).__name__}`\n"
+        error_msg += f"**Описание:** `{str(error)}`\n\n"
+
+        traceback_msg = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        if len(traceback_msg) > 3000:
+            traceback_msg = traceback_msg[:1500] + "\n...\n" + traceback_msg[-1500:]
+
+        error_msg += f"```python\n{traceback_msg}\n```"
+
+        try:
+            for admin in Utils.ADMIN_IDS:
+                await self.send_message(admin, error_msg)
+        except Exception as e:
+            self.logger.error(f"Ошибка при отправке сообщения: {e}")
 
     async def callbacks(self, _: Client, query: CallbackQuery):
         """Функция приёма колбеков"""
@@ -259,7 +296,7 @@ class CustomClient(Client):
                 reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
             )
             if await self.tb.await_payment(r["PaymentId"]):
-                
+
                 self.logger.info(
                     f"Пользователь {query.from_user.full_name}({query.from_user.id})"
                     f" оплатил заказ {r['PaymentId']}"
@@ -297,6 +334,8 @@ class CustomClient(Client):
                     pass
             else:
                 try:
-                    await message.edit_text("Оплата отклонена, попробуйте позже, пожалуйста")
+                    await message.edit_text(
+                        "Оплата отклонена, попробуйте позже, пожалуйста"
+                    )
                 except ValueError:
                     pass
