@@ -38,17 +38,17 @@ class CustomClient(Client):
 
         if not self.check_args(api_id, api_hash, name, bot_token):
             return
-        logging.info("Проверка аргументов прошла успешно")
+        self.logger.info("Проверка аргументов прошла успешно")
 
         super().__init__(
             name,
             api_id,
             api_hash,
             bot_token=bot_token,
-            workers=24,
         )
         self.setup_handlers()
         self.setup_callbacks()
+        self.logger.info("Настройка прошла успешно")
 
     def check_args(
         self,
@@ -259,8 +259,9 @@ class CustomClient(Client):
                 reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
             )
             if await self.tb.await_payment(r["PaymentId"]):
+                
                 self.logger.info(
-                    f"Пользователь {message.from_user.full_name}({message.from_user.id})"
+                    f"Пользователь {query.from_user.full_name}({query.from_user.id})"
                     f" оплатил заказ {r['PaymentId']}"
                 )
                 try:
@@ -273,31 +274,29 @@ class CustomClient(Client):
                         "`❌ Вы уже зарегистрированы на это событие!!!`",
                     )
                     return
-                await message.edit_text("Подождите, идёт генерация Вашего QR кода!")
-                image = await Utils.gen_qr_code(
-                    f"https://t.me/{self.me.username}?start={hash_code}"
-                )
-                img_byte_arr = io.BytesIO()
-                image.save(img_byte_arr, format="PNG")
-                img_byte_arr.seek(0)
-                await message.reply_photo(
-                    photo=img_byte_arr,
-                    caption=f"Ваш QR на дискотеку "
-                    f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
-                )
-                self.logger.info(
-                    "Пользователь %s (%s) получил код %s",
-                    message.from_user.full_name,
-                    message.from_user.id,
-                    hash_code,
-                )
+                try:
+                    await message.edit_text("Подождите, идёт генерация Вашего QR кода!")
+                    image = await Utils.gen_qr_code(
+                        f"https://t.me/{self.me.username}?start={hash_code}"
+                    )
+                    img_byte_arr = io.BytesIO()
+                    image.save(img_byte_arr, format="PNG")
+                    img_byte_arr.seek(0)
+                    await message.reply_photo(
+                        photo=img_byte_arr,
+                        caption=f"Ваш QR на дискотеку "
+                        f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                    )
+                    self.logger.info(
+                        "Пользователь %s (%s) получил код %s",
+                        query.from_user.full_name,
+                        query.from_user.id,
+                        hash_code,
+                    )
+                except Exception as e:
+                    pass
             else:
                 try:
-                    await message.edit_text("Оплата отклонена, попробуйте позже")
+                    await message.edit_text("Оплата отклонена, попробуйте позже, пожалуйста")
                 except ValueError:
                     pass
-
-    def run(self, coroutine: Optional[Coroutine[Any, Any, Any]] = None) -> None:
-        """Запуск клиента"""
-        self.logger.info(f"Старт бота в {datetime.datetime.now(datetime.UTC)}")
-        super().run(coroutine)
