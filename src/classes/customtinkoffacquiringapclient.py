@@ -1,4 +1,5 @@
 """Модуль кастомного класса клиента тинькоффа"""
+
 import asyncio
 import time
 
@@ -7,6 +8,7 @@ from tinkoff_acquiring.client import TinkoffAcquiringAPIClient, TinkoffAPIExcept
 
 class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
     """Класс кастомного класса клиента тинькоффа"""
+
     def __init__(self, terminal_key: str | None, secret: str | None):
         if not (terminal_key, secret):
             raise ValueError("terminal_key и secret не могут быть пустыми")
@@ -29,8 +31,6 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
                 if state:
                     if state == "CONFIRMED":
                         return True
-                    if state == "REJECTED":
-                        return False
                     if state == "FORM_SHOWED":
                         timeout = 240
             except TinkoffAPIException:
