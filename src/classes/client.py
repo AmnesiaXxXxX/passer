@@ -298,7 +298,9 @@ class CustomClient(Client):
                 "".join(data.split("_")[3:]), Utils.DATE_FORMAT
             )
 
-            result = self.db.check_registration_by_tgid(query.from_user.id, date.date(), is_active=False)
+            result = self.db.check_registration_by_tgid(
+                query.from_user.id, date.date(), is_active=False
+            )
             if result:
                 await query.answer("❌ Вы уже были зарегистрированы на это событие!!!")
                 return
@@ -360,9 +362,3 @@ class CustomClient(Client):
                     query.from_user.id,
                     hash_code,
                 )
-
-            else:
-                try:
-                    await message.edit_text("Оплата отклонена, попробуйте позже")
-                except MessageNotModified:
-                    pass
