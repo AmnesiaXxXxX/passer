@@ -1,9 +1,10 @@
 """Модуль базы данных"""
 
-import hashlib
 import sqlite3 as sql
 from datetime import UTC, date, datetime
 from typing import List, Optional
+
+from src.utils import Utils
 
 
 class Database:
@@ -16,7 +17,6 @@ class Database:
 
     def create_tables(self):
         """Создание таблиц"""
-        # Создание таблицы visitors, если не существует
         self.cur.execute(
             """
         CREATE TABLE IF NOT EXISTS visitors (
@@ -27,7 +27,14 @@ class Database:
         )
         """
         )
-        # Создание таблицы registrations, если не существует
+        self.cur.execute(
+            """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id TEXT NOT NULL
+        )
+        """
+        )
         self.cur.execute(
             """
         CREATE TABLE IF NOT EXISTS registrations (
@@ -51,11 +58,20 @@ class Database:
         self.cur.execute(query)
         return self.cur.fetchall()
 
-    @staticmethod
-    def generate_hash(tg_id: int | str, dt: datetime) -> str:
-        """Внутренняя функция генерация хеша"""
-        data = f"{tg_id}{dt.isoformat()}"
-        return hashlib.sha256(data.encode()).hexdigest()
+    def get_all_users(self, tg_id: Optional[str | int] = None):
+        query = "SELECT * FROM users"
+        if tg_id:
+            query += " WHERE tg_id LIKE '%' || '{q}' || '%'"
+        self.cur.execute(query)
+        return self.cur.fetchall()
+
+    def add_user(self, tg_id: str | int):
+        try:
+            if tg_id not in self.get_all_users(tg_id)[0]:
+                query = "INSERT INTO users(tg_id) VALUES(?)"
+                self.cur.execute(query, (str(tg_id),))
+        except IndexError:
+            return False
 
     def reg_new_visitor(
         self,
@@ -84,7 +100,7 @@ class Database:
 
         if entry_datetime is None:
             entry_datetime = datetime.now(UTC)
-        hash_code = self.generate_hash(tg_id, entry_datetime)
+        hash_code = Utils.generate_hash(tg_id, entry_datetime)
         query = "INSERT INTO visitors (tg_id, to_datetime, hash_code) VALUES (?, ?, ?)"
         self.cur.execute(query, (str(tg_id), to_datetime.date(), hash_code))
         return hash_code
@@ -160,10 +176,17 @@ class Database:
         return False
 
     def check_registration_by_tgid(
-        self, tg_id: int | str, to_datetime: datetime | date
+        self,
+        tg_id: int | str,
+        to_datetime: datetime | date,
+        is_active: bool | None = True,
     ):
         """Проверка записан ли пользователь на ивент по тг айди"""
-        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
+        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ?"
+        if isinstance(is_active, bool):
+            query += f" AND is_active = {1 if is_active else 0}"
+            
+        print(query)
         self.cur.execute(
             query,
             (

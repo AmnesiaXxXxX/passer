@@ -10,6 +10,7 @@ import PIL.Image
 import qrcode
 from dotenv import load_dotenv
 from pyrogram.types import Message
+import hashlib
 
 load_dotenv()
 T = TypeVar("T")
@@ -26,9 +27,7 @@ def get_env_admin_ids() -> list[int | str]:
 class Utils:
     """Класс утилит"""
 
-    START_MESSAGE: str = (
-        """**🔥 Добро пожаловать в бот дискотеки S.T.A.R! 🔥**"""
-    )
+    START_MESSAGE: str = """**🔥 Добро пожаловать в бот дискотеки S.T.A.R! 🔥**"""
     DATE_FORMAT: str = "%Y-%m-%d"
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
     ADMIN_IDS: list[int | str] = get_env_admin_ids()
@@ -36,6 +35,12 @@ class Utils:
     FALSE_CODE = "`❌ Код неверный!`"
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
     COST = 250
+
+    @staticmethod
+    def generate_hash(tg_id: int | str, dt: datetime) -> str:
+        """Внутренняя функция генерация хеша"""
+        data = f"{tg_id}{dt.isoformat()}"
+        return hashlib.sha256(data.encode()).hexdigest()
 
     @classmethod
     def update_admin_ids(cls) -> None:

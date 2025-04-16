@@ -3,10 +3,12 @@
 from typing import List, Union
 from datetime import datetime
 
+from pyrogram.client import Client
 from pyrogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButtonBuy,
+    Message,
 )
 
 from src.classes.database import Database
@@ -38,7 +40,7 @@ class ButtonsMenu:
     def get_buy_markup(cls, tg_id: int | str):
         """Возвращает маркап кнопок для покупки"""
         db = Database()
-        user = db.check_registration_by_tgid
+        check = db.check_registration_by_tgid
         buttons: List[Union[InlineKeyboardButton, InlineKeyboardButtonBuy]] = []
 
         for date in db.get_events(display_all=True, show_old=False):
@@ -46,12 +48,16 @@ class ButtonsMenu:
             button_text = (
                 f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')}"
                 f"({available} {ButtonsMenu.decline_tickets(available)})"
-                f"{'✅' if user(tg_id, date[0]) else ''}"
+                f"{'✅' if check(tg_id, date[0], is_active=True) else ''}"
             )
-
+            callback_text = (
+                f"reg_user_to_{date[0]}" if date[2] - date[1] > 0 else "reg_error"
+            )
+            if check(tg_id, date[0], True):
+                callback_text = "reg_error_already_registrate"
             button = InlineKeyboardButton(
                 button_text,
-                f"reg_user_to_{date[0]}" if date[2] - date[1] > 0 else "reg_error",
+                callback_text,
             )
             buttons.append(button)
 
@@ -60,8 +66,19 @@ class ButtonsMenu:
         # Разбиваем кнопки на группы по 3
         return InlineKeyboardMarkup(result)
 
-    @classmethod
-    def get_start_markup(cls) -> InlineKeyboardMarkup:
+    @staticmethod
+    def get_newsletter_markup(tg_id: int | str) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Отправить", f"send_{tg_id}"),
+                    InlineKeyboardButton("Отмена", f"send_cancel"),
+                ],
+            ]
+        )
+
+    @staticmethod
+    def get_start_markup() -> InlineKeyboardMarkup:
         """Возвращает стартовый маркап с кнопками"""
         return InlineKeyboardMarkup(
             [

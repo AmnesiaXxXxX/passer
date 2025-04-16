@@ -7,7 +7,7 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Self, Tuple, TypeVar
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -19,6 +19,8 @@ from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
 from src.utils import Utils
+
+ClientVar = TypeVar("ClientVar")
 
 
 class CustomClient(Client):
@@ -36,7 +38,7 @@ class CustomClient(Client):
         self.tb = CustomTinkoffAcquiringAPIClient(
             os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
         )
-
+        self.messages: dict[int | str, str] = {}
         if not self.check_args(api_id, api_hash, name, bot_token):
             return
         self.logger.info("Проверка аргументов прошла успешно")
@@ -97,7 +99,7 @@ class CustomClient(Client):
         ]
         return super_functions, self_functions
 
-    def error_decorator(self, func: Callable) -> Callable:
+    def error_decorator(self, func: Callable[..., Any]):
         """Декоратор для обработки ошибок"""
 
         async def wrapper(*args, **kwargs):
@@ -140,6 +142,16 @@ class CustomClient(Client):
             await message.reply(Utils.FALSE_CODE_ALREADY_USED)
         else:
             await message.reply(Utils.FALSE_CODE)
+
+    async def handle_sendall_admin(self, message: Message):
+
+        answer = await message.ask("Введите текст для рассылки или `выход` для отмены")
+        if not answer.text.lower() == "выход":
+            await message.reply(
+                f"Ваша рассылка выглядит вот так:\n\n```text\n{answer.content}```",
+                reply_markup=ButtonsMenu.get_newsletter_markup(message.from_user.id),
+            )
+            self.messages[str(message.from_user.id)] = answer.content
 
     async def handle_main_start(self, message: Message):
         """Главная функция для команд `main|start`"""
@@ -246,6 +258,22 @@ class CustomClient(Client):
         data = str(query.data)
         message = query.message
 
+        if data.startswith("send"):
+            tg_id = data.split("_")[1]
+            if tg_id == "cancel":
+                await message.reply("Рассылка отменена")
+                await message.delete()
+                return
+            users = self.db.get_all_users()
+
+            msg = await message.reply(
+                f"Рассылка запущена для {len(users)} пользователей"
+            )
+            for user in users:
+                await self.send_message(user[1], self.messages[tg_id])
+            await msg.edit_text(f"Завершена рассылка для {len(users)} пользователей")
+            await message.delete()
+
         if data.startswith("useragreement"):
             await message.edit_text(
                 """Пользовательское соглашение\n1. Общие положения\n1.1. Настоящее Пользовательское\nсоглашение (далее — «Соглашение») регулирует правила посещения дискотеки на базе Дома молодёжи (г. Боровичи, ул. 9 Января, д. 46) (далее —\n«Мероприятие»).\n1.2. Организатор оставляет за собой право вносить изменения в правила посещения и условия Соглашения.\nАктуальная версия всегда доступна на официальных ресурсах.\n1.3. Посещение Мероприятия означает согласие с условиями данного Соглашения.\n\n2. Условия посещения\n2.1. Мероприятие рекомендовано для лиц в возрасте от 14 до\n25 лет.\n2.2. Организатор в праве запросить предъявление документа, удостоверяющего возраст (паспорт, ученический билет с фото, справку из\nшколы).\n2.3. Вход строго запрещён лицам в состоянии алкогольного или наркотического опьянения\n\n3. Правила поведения\n3.1. Посетители обязаны:\n- Соблюдать общественный порядок и нормы морали.\n- Уважительно относиться к другим гостям и персоналу.\n- Выполнять требования администрации и охраны.\n3.2. Запрещено:\n- Употребление алкоголя, табака, наркотических веществ.\n- Ношение оружия, колюще-режущих предметов, взрывчатых\nвеществ.\n- Проявление агрессии, буллинга, дискриминации.\n- Порча имущества учреждения.\n3.3. В случае нарушений администрация вправе удалить посетителя без компенсации стоимости билета.\n\n4. Безопасность и контроль\n4.1. Организаторы проводят досмотр на входе для предотвращения проноса запрещённых предметов.\n4.2. В случае ЧП необходимо следовать указаниям\nперсонала.\n\n5. Ответственность\n5.1. Организатор не несёт ответственности за:\n- Личные вещи посетителей (рекомендуется не оставлять ценные вещи без присмотра).\n- Поведение посетителей вне территории Мероприятия.\n5.2. Родители/законные представители несовершеннолетних\nнесут ответственность за действия своих детей в рамках действующего законодательства.\n\n6. Прочие условия\n6.1. Организатор вправе использовать материалы с Мероприятия\nв рекламных целях.\n\n7. Условия использования кошелька\n7.1 Сумма, внесённая на счёт кошелька без весомой на то причины, не возвращается\n7.2 Возврат средств осуществляется на баланс кошелька исключительно при\nвозврате билета\n\nДата вступления в силу: 29.03.2025\nКонтакты организаторов:\nНиколаев Даниил Александрович\nstutututuf@gmail.com\nАжимиров Руслан Рамильевич\nazimirovr@mail.ru\nИванов Антон Андреевич\nmiiqwf@gmail.com""",
@@ -270,9 +298,9 @@ class CustomClient(Client):
                 "".join(data.split("_")[3:]), Utils.DATE_FORMAT
             )
 
-            result = self.db.check_registration_by_tgid(query.from_user.id, date.date())
+            result = self.db.check_registration_by_tgid(query.from_user.id, date.date(), is_active=False)
             if result:
-                await query.answer("❌ Вы уже зарегистрированы на это событие!!!")
+                await query.answer("❌ Вы уже были зарегистрированы на это событие!!!")
                 return
             if self.db.is_event_is_full(date):
                 await query.answer("❌ Это событие закончилось или места кончились")
@@ -287,11 +315,11 @@ class CustomClient(Client):
             # }
             # token = sha256("".join(receipt).encode()).hexdigest()
             # receipt["Token"] = token
+
             r = await self.tb.init_payment(
                 cost,
                 hash(query.from_user.id + time.time()),
                 description,
-                # receipt=receipt,
             )
 
             await message.edit_text(
