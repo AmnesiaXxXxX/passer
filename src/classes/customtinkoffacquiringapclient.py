@@ -14,7 +14,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
             raise ValueError("terminal_key и secret не могут быть пустыми")
         super().__init__(terminal_key, secret)
 
-    async def await_payment(self, order_id: str, timeout: float = 120.0) -> bool:
+    async def await_payment(self, order_id: str, timeout: float = 240.0) -> bool:
         """
         Ждем подтверждения оплаты в течение заданного времени (timeout, по умолчанию 60 секунд).
         Возвращает True если оплата подтверждена, иначе False.
@@ -32,7 +32,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
                     if state == "CONFIRMED":
                         return True
                     if state == "FORM_SHOWED":
-                        timeout = 240
+                        timeout *= 2
             except TinkoffAPIException:
                 pass
             except asyncio.CancelledError:
