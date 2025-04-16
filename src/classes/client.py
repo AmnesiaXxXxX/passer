@@ -14,7 +14,7 @@ from pyrogram.client import Client
 from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
 from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import CallbackQuery, Message
-
+from pyrogram.errors.exceptions.bad_request_400 import MessageNotModified
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
@@ -340,31 +340,29 @@ class CustomClient(Client):
                         "`❌ Вы уже зарегистрированы на это событие!!!`",
                     )
                     return
-                try:
-                    await message.edit_text("Подождите, идёт генерация Вашего QR кода!")
-                    image = await Utils.gen_qr_code(
-                        f"https://t.me/{self.me.username}?start={hash_code}"
-                    )
-                    img_byte_arr = io.BytesIO()
-                    image.save(img_byte_arr, format="PNG")
-                    img_byte_arr.seek(0)
-                    await message.reply_photo(
-                        photo=img_byte_arr,
-                        caption=f"Ваш QR на дискотеку "
-                        f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
-                    )
-                    self.logger.info(
-                        "Пользователь %s (%s) получил код %s",
-                        query.from_user.full_name,
-                        query.from_user.id,
-                        hash_code,
-                    )
-                except Exception as e:
-                    pass
+
+                image = await Utils.gen_qr_code(
+                    f"https://t.me/{self.me.username}?start={hash_code}"
+                )
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format="PNG")
+                img_byte_arr.seek(0)
+                await message.reply_photo(
+                    photo=img_byte_arr,
+                    caption=f"Ваш QR на дискотеку "
+                    f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
+                )
+                self.logger.info(
+                    "Пользователь %s (%s) получил код %s",
+                    query.from_user.full_name,
+                    query.from_user.id,
+                    hash_code,
+                )
+
             else:
                 try:
                     await message.edit_text(
-                        "Оплата отклонена, попробуйте позже, пожалуйста"
+                        "Оплата отклонена, попробуйте позже"
                     )
-                except ValueError:
+                except MessageNotModified:
                     pass
