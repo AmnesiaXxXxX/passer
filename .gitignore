@@ -8,6 +8,7 @@ __pycache__/
 dump*
 *.db
 *.sqlite
+.vscode/
 # Distribution / packaging
 .Python
 build/
