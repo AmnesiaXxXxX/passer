@@ -176,10 +176,17 @@ class Database:
         return False
 
     def check_registration_by_tgid(
-        self, tg_id: int | str, to_datetime: datetime | date
+        self,
+        tg_id: int | str,
+        to_datetime: datetime | date,
+        is_active: bool | None = True,
     ):
         """Проверка записан ли пользователь на ивент по тг айди"""
-        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ? AND is_active = 1"
+        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ?"
+        if isinstance(is_active, bool):
+            query += f" AND is_active = {1 if is_active else 0}"
+            
+        print(query)
         self.cur.execute(
             query,
             (

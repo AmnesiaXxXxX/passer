@@ -10,6 +10,7 @@ from src.logger import setup_logging
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("tinkoff_acquiring.client").level = logging.ERROR
+logging.getLogger("httpx").level = logging.ERROR
 setup_logging()
 load_dotenv(override=True)
 NAME = os.getenv("NAME", "bot")
