@@ -142,7 +142,7 @@ class CustomClient(Client):
             await message.reply(Utils.FALSE_CODE)
 
     async def handle_main_start(self, message: Message):
-        """Главная функция для команд `main|start|help`"""
+        """Главная функция для команд `main|start`"""
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             try:
@@ -221,7 +221,7 @@ class CustomClient(Client):
 
     async def error_handler(self, error: Exception, context: str = ""):
         """Асинхронный обработчик ошибок"""
-        error_msg = f"⚠️ **Ошибка в боте** ⚠️\n\n"
+        error_msg = "⚠️ **Ошибка в боте** ⚠️\n\n"
         if context:
             error_msg += f"**Контекст:** `{context}`\n\n"
         error_msg += f"**Тип ошибки:** `{type(error).__name__}`\n"
@@ -255,6 +255,9 @@ class CustomClient(Client):
         if data.startswith("reg_error"):
             await query.answer("❌ Это событие закончилось или места кончились")
         if data.startswith("buytickets"):
+            self.logger.info(
+                f"Пользователь {query.from_user.full_name}({query.from_user.id}) покупает билеты..."
+            )
             await message.edit_reply_markup(
                 ButtonsMenu.get_buy_markup(query.from_user.id)
             )
@@ -332,8 +335,6 @@ class CustomClient(Client):
 
             else:
                 try:
-                    await message.edit_text(
-                        "Оплата отклонена, попробуйте позже"
-                    )
+                    await message.edit_text("Оплата отклонена, попробуйте позже")
                 except MessageNotModified:
                     pass
