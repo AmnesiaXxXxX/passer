@@ -4,7 +4,7 @@ import sqlite3 as sql
 from datetime import UTC, date, datetime
 from typing import List, Optional
 
-from utils import Utils
+from src.utils import Utils
 
 
 class Database:
@@ -17,7 +17,6 @@ class Database:
 
     def create_tables(self):
         """Создание таблиц"""
-        # Создание таблицы visitors, если не существует
         self.cur.execute(
             """
         CREATE TABLE IF NOT EXISTS visitors (
@@ -36,7 +35,6 @@ class Database:
         )
         """
         )
-        # Создание таблицы registrations, если не существует
         self.cur.execute(
             """
         CREATE TABLE IF NOT EXISTS registrations (
@@ -60,15 +58,20 @@ class Database:
         self.cur.execute(query)
         return self.cur.fetchall()
 
-    def get_all_users(self):
+    def get_all_users(self, tg_id: Optional[str | int] = None):
         query = "SELECT * FROM users"
+        if tg_id:
+            query += " WHERE tg_id LIKE '%' || '{q}' || '%'"
         self.cur.execute(query)
         return self.cur.fetchall()
 
-    def set_user(self, tg_id: str | int):
-        if tg_id not in self.get_all_users():
-            query = "INSERT INTO users(tg_id) VALUES(?)"
-            self.cur.execute(query, str(tg_id))
+    def add_user(self, tg_id: str | int):
+        try:
+            if tg_id not in self.get_all_users(tg_id)[0]:
+                query = "INSERT INTO users(tg_id) VALUES(?)"
+                self.cur.execute(query, (str(tg_id),))
+        except IndexError:
+            return False
 
     def reg_new_visitor(
         self,

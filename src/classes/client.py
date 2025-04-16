@@ -7,7 +7,8 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Callable, List, Optional, Tuple
+from types import CoroutineType
+from typing import Any, Callable, List, Optional, Self, Tuple, TypeVar
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -19,6 +20,8 @@ from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
 from src.utils import Utils
+
+ClientVar = TypeVar("ClientVar")
 
 
 class CustomClient(Client):
@@ -36,7 +39,7 @@ class CustomClient(Client):
         self.tb = CustomTinkoffAcquiringAPIClient(
             os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
         )
-
+        self.messages: dict[int | str, str]
         if not self.check_args(api_id, api_hash, name, bot_token):
             return
         self.logger.info("Проверка аргументов прошла успешно")
@@ -97,7 +100,7 @@ class CustomClient(Client):
         ]
         return super_functions, self_functions
 
-    def error_decorator(self, func: Callable) -> Callable:
+    def error_decorator(self, func: Callable[..., Any]):
         """Декоратор для обработки ошибок"""
 
         async def wrapper(*args, **kwargs):
@@ -141,8 +144,27 @@ class CustomClient(Client):
         else:
             await message.reply(Utils.FALSE_CODE)
 
+    async def handle_sendall_admin(self, message: Message):
+
+        answer = await message.ask("Введите текст для рассылки или `выход` для отмены")
+        if not answer.text.lower() == "выход":
+            answer1 = await message.ask(
+                f"Ваша рассылка выглядит вот так:\n\n```text\n{answer.content}```\n\nОтправьте `нет` для отправки или `отправить` для рассылки"
+            )
+            if answer1.text.lower() == "отправить":
+                users = self.db.get_all_users()
+                await message.reply(f"Рассылка запущена для {len(users)} пользователей")
+                for user in users:
+                    await self.send_message(user[1], answer.text.lower())
+                await message.reply(
+                    f"Завершена рассылка для {len(users)} пользователей"
+                )
+                return
+        await message.reply("Рассылка отменена")
+
     async def handle_main_start(self, message: Message):
         """Главная функция для команд `main|start|help`"""
+        self.db.add_user(message.from_user.id)
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             try:
