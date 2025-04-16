@@ -9,6 +9,7 @@ dump*
 *.db
 *.sqlite
 .vscode/
+database.db
 # Distribution / packaging
 .Python
 build/

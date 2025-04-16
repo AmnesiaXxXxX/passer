@@ -3,10 +3,12 @@
 from typing import List, Union
 from datetime import datetime
 
+from pyrogram.client import Client
 from pyrogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButtonBuy,
+    Message,
 )
 
 from src.classes.database import Database
@@ -60,8 +62,19 @@ class ButtonsMenu:
         # Разбиваем кнопки на группы по 3
         return InlineKeyboardMarkup(result)
 
-    @classmethod
-    def get_start_markup(cls) -> InlineKeyboardMarkup:
+    @staticmethod
+    def get_newsletter_markup(tg_id: int | str) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Отправить", f"send_{tg_id}"),
+                    InlineKeyboardButton("Отмена", f"send_cancel"),
+                ],
+            ]
+        )
+
+    @staticmethod
+    def get_start_markup() -> InlineKeyboardMarkup:
         """Возвращает стартовый маркап с кнопками"""
         return InlineKeyboardMarkup(
             [
