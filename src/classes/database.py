@@ -1,9 +1,10 @@
 """Модуль базы данных"""
 
-import hashlib
 import sqlite3 as sql
 from datetime import UTC, date, datetime
 from typing import List, Optional
+
+from utils import Utils
 
 
 class Database:
@@ -24,6 +25,14 @@ class Database:
             tg_id TEXT NOT NULL,
             to_datetime TEXT NOT NULL,
             hash_code TEXT NOT NULL
+        )
+        """
+        )
+        self.cur.execute(
+            """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id TEXT NOT NULL
         )
         """
         )
@@ -51,11 +60,15 @@ class Database:
         self.cur.execute(query)
         return self.cur.fetchall()
 
-    @staticmethod
-    def generate_hash(tg_id: int | str, dt: datetime) -> str:
-        """Внутренняя функция генерация хеша"""
-        data = f"{tg_id}{dt.isoformat()}"
-        return hashlib.sha256(data.encode()).hexdigest()
+    def get_all_users(self):
+        query = "SELECT * FROM users"
+        self.cur.execute(query)
+        return self.cur.fetchall()
+
+    def set_user(self, tg_id: str | int):
+        if tg_id not in self.get_all_users():
+            query = "INSERT INTO users(tg_id) VALUES(?)"
+            self.cur.execute(query, str(tg_id))
 
     def reg_new_visitor(
         self,
@@ -84,7 +97,7 @@ class Database:
 
         if entry_datetime is None:
             entry_datetime = datetime.now(UTC)
-        hash_code = self.generate_hash(tg_id, entry_datetime)
+        hash_code = Utils.generate_hash(tg_id, entry_datetime)
         query = "INSERT INTO visitors (tg_id, to_datetime, hash_code) VALUES (?, ?, ?)"
         self.cur.execute(query, (str(tg_id), to_datetime.date(), hash_code))
         return hash_code
