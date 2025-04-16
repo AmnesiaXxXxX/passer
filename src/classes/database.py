@@ -3,7 +3,7 @@
 import sqlite3 as sql
 from datetime import UTC, date, datetime
 from typing import List, Optional
-
+import logging
 from src.utils import Utils
 
 
@@ -14,6 +14,7 @@ class Database:
         self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
         self.cur = self.con.cursor()
         self.create_tables()  # Добавлено: создание таблиц при старте
+        self.logger = logging.getLogger("database")
 
     def create_tables(self):
         """Создание таблиц"""
@@ -59,18 +60,24 @@ class Database:
         return self.cur.fetchall()
 
     def get_all_users(self, tg_id: Optional[str | int] = None):
-        query = "SELECT * FROM users"
+        query = "SELECT tg_id FROM users"
         if tg_id:
-            query += " WHERE tg_id LIKE '%' || '{q}' || '%'"
-        self.cur.execute(query)
+            query += " WHERE tg_id LIKE '%' || ? || '%'"
+        self.cur.execute(query, (tg_id,))
         return self.cur.fetchall()
 
     def add_user(self, tg_id: str | int):
+        users = self.get_all_users(str(tg_id))
+        query = "INSERT INTO users(tg_id) VALUES(?)"
         try:
-            if tg_id not in self.get_all_users(tg_id)[0]:
-                query = "INSERT INTO users(tg_id) VALUES(?)"
+            if len(users) > 0:
+                return False
+            else:
                 self.cur.execute(query, (str(tg_id),))
-        except IndexError:
+                self.logger.info(f"Добавление в бд users пользователя {tg_id}")
+                return True
+        except IndexError as e:
+            print(e)
             return False
 
     def reg_new_visitor(
@@ -185,7 +192,7 @@ class Database:
         query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ?"
         if isinstance(is_active, bool):
             query += f" AND is_active = {1 if is_active else 0}"
-            
+
         print(query)
         self.cur.execute(
             query,

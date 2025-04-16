@@ -155,10 +155,11 @@ class CustomClient(Client):
 
     async def handle_main_start(self, message: Message):
         """Главная функция для команд `main|start`"""
+        self.db.add_user(message.from_user.id)
         args = message.command[1:]
         if args and message.from_user.id in Utils.ADMIN_IDS:
             try:
-                user = self.db.get_all_visitors(args[0])[0]
+                user = self.db.get_all_visitors(args[0])
                 if user:
                     if not user[3]:
                         await message.reply(Utils.FALSE_CODE_ALREADY_USED)
@@ -257,7 +258,7 @@ class CustomClient(Client):
         """Функция приёма колбеков"""
         data = str(query.data)
         message = query.message
-
+        self.db.add_user(query.from_user.id)
         if data.startswith("send"):
             tg_id = data.split("_")[1]
             if tg_id == "cancel":
