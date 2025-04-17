@@ -35,14 +35,6 @@ class CustomClient(Client):
     ):
         # Настройка логгера
         self.logger = logging.getLogger("pyrobot")
-        self.logger.setLevel(logging.DEBUG)
-
-        # Добавление обработчика для записи в файл
-        file_handler = logging.FileHandler("bot.log")
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
-        self.logger.addHandler(file_handler)
 
         self.logger.info("Инициализация CustomClient...")
 
@@ -54,7 +46,6 @@ class CustomClient(Client):
                 os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
             )
             self.logger.debug("Клиент Tinkoff API успешно инициализирован")
-
             self.messages: dict[int | str, str] = {}
 
             if not self.check_args(api_id, api_hash, name, bot_token):
@@ -68,6 +59,8 @@ class CustomClient(Client):
                 api_id,
                 api_hash,
                 bot_token=bot_token,
+                workers=28,
+                max_concurrent_transmissions=0
             )
 
             self.setup_handlers()
@@ -546,7 +539,7 @@ class CustomClient(Client):
                     reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
                 )
 
-                if await self.tb.await_payment(r["PaymentId"]):
+                while await self.tb.await_payment(r["PaymentId"]):
                     self.logger.info(f"Платеж {r['PaymentId']} подтвержден")
 
                     try:
@@ -575,7 +568,7 @@ class CustomClient(Client):
                         f"{date_str}!\n\n\n__Резервный код__:\n`{hash_code}`",
                     )
                     self.logger.info("QR-код успешно отправлен пользователю")
-
+                    
         except MessageNotModified:
             self.logger.debug("Сообщение не требует изменений")
         except Exception as e:

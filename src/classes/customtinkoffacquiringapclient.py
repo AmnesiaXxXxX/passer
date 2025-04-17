@@ -37,5 +37,5 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
             except asyncio.CancelledError:
                 break
 
-            await asyncio.sleep(2)
+            await asyncio.sleep(10)
         return False
