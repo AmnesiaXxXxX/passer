@@ -160,10 +160,14 @@ class CustomClient(Client):
             self.logger.error(f"Ошибка при настройке колбеков: {str(e)}", exc_info=True)
             raise
 
+    async def server_not_working(self, client, message:Message):
+        await message.reply("Ведутся серверные работы", reply_to_message_id=message.id)
+
     def setup_handlers(self):
         """Настройка хендлеров с автоматической обработкой ошибок"""
-        self.logger.info("Настройка обработчиков сообщений...")
-
+        # self.logger.info("Настройка обработчиков сообщений...")
+        self.add_handler(MessageHandler(self.server_not_working))
+        return
         try:
             _, self_functions = self.get_functions()
 
