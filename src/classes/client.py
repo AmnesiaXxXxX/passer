@@ -442,7 +442,7 @@ class CustomClient(Client):
             user_info = f"{query.from_user.full_name} (ID: {query.from_user.id})"
 
             self.db.add_user(query.from_user.id)
-            self.logger.debug(f"Пользователь {user_info} добавлен/обновлен в БД")
+            # self.logger.debug(f"Пользователь {user_info} добавлен/обновлен в БД")
 
             if data.startswith("send"):
                 self.logger.info("Обработка callback для рассылки")
@@ -486,7 +486,7 @@ class CustomClient(Client):
             elif data.startswith("useragreement"):
                 self.logger.debug("Пользователь запросил пользовательское соглашение")
                 await message.edit_text(
-                    """Пользовательское соглашение...""",  # сократил для краткости
+                    open("USER_AGREEMENT.txt", "r", encoding="utf-8").read(),
                     reply_markup=ButtonsMenu.get_menu_markup(),
                 )
 
@@ -518,7 +518,7 @@ class CustomClient(Client):
                 )
                 if result:
                     self.logger.warning(
-                        "Пользователь уже зарегистрирован на это событие"
+                        f"Пользователь {query.from_bot.id} уже зарегистрирован на это событие"
                     )
                     await query.answer(
                         "❌ Вы уже были зарегистрированы на это событие!!!"

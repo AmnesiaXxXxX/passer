@@ -22,7 +22,6 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
         """
         state = ""
         start = time.monotonic()
-        print(f"Выход: {hash(order_id)}")
 
         while time.monotonic() - start < timeout:
             try:

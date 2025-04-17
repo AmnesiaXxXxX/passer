@@ -13,8 +13,8 @@ class Database:
     def __init__(self, name: str = "database"):
         self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
         self.cur = self.con.cursor()
-        self.create_tables()  # Добавлено: создание таблиц при старте
         self.logger = logging.getLogger("database")
+        self.create_tables()  # Добавлено: создание таблиц при старте
 
     def create_tables(self):
         """Создание таблиц"""
@@ -45,6 +45,7 @@ class Database:
         )
         """
         )
+        self.logger.info("Создание таблиц успешно завершено.")
 
     def get_all_visitors(self, q: Optional[str | int | datetime] = None) -> List[str]:
         """Возвращает всех пользователей либо пользователей по фильтру"""
@@ -77,7 +78,6 @@ class Database:
                 self.logger.info(f"Добавление в бд users пользователя {tg_id}")
                 return True
         except IndexError as e:
-            print(e)
             return False
 
     def reg_new_visitor(
@@ -158,7 +158,7 @@ class Database:
             return True
         except (ValueError, IndexError) as e:
             self.con.rollback()
-            print(f"Ошибка при деактивации посетителя: {e}")
+            self.logger.error(f"Ошибка при деактивации посетителя: {e}")
             return False
 
     def get_available_slots(self, to_datetime: str) -> int:
@@ -193,7 +193,6 @@ class Database:
         if isinstance(is_active, bool):
             query += f" AND is_active = {1 if is_active else 0}"
 
-        print(query)
         self.cur.execute(
             query,
             (
@@ -227,7 +226,6 @@ class Database:
         query = "SELECT * FROM registrations WHERE visitors_count < max_visitors AND date == ?"
         self.cur.execute(query, (str(to_datetime.date()),))
         result = self.cur.fetchone()
-        print(to_datetime.date(), result)
         if result:
             return False
         return True

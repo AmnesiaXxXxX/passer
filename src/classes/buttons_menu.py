@@ -48,7 +48,7 @@ class ButtonsMenu:
             button_text = (
                 f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')}"
                 f"({available} {ButtonsMenu.decline_tickets(available)})"
-                f"{'✅' if check(tg_id, date[0], is_active=True) else ''}"
+                f"{'✅' if check(tg_id, date[0], is_active=None) else ''}"
             )
             callback_text = (
                 f"reg_user_to_{date[0]}" if date[2] - date[1] > 0 else "reg_error"
