@@ -60,7 +60,7 @@ class CustomClient(Client):
                 api_hash,
                 bot_token=bot_token,
                 workers=28,
-                max_concurrent_transmissions=0
+                max_concurrent_transmissions=0,
             )
 
             self.setup_handlers()
@@ -315,24 +315,19 @@ class CustomClient(Client):
         """Генерация QR-кода"""
         self.logger.info(f"Генерация QR-кода по запросу от {message.from_user.id}")
 
-        try:
-            msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
-            self.logger.debug("Начало генерации QR-кода")
+        msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
+        self.logger.debug("Начало генерации QR-кода")
 
-            image = await Utils.gen_qr_code(message.command[1:])
-            self.logger.debug("QR-код сгенерирован")
+        image = await Utils.gen_qr_code(message.command[1:])
+        self.logger.debug("QR-код сгенерирован")
 
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format="PNG")
-            img_byte_arr.seek(0)
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
 
-            await msg.delete()
-            await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
-            self.logger.info("QR-код успешно отправлен")
-
-        except Exception as e:
-            self.logger.error(f"Ошибка при генерации QR-кода: {str(e)}", exc_info=True)
-            await message.reply("❌ Произошла ошибка при генерации QR-кода")
+        await msg.delete()
+        await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
+        self.logger.info("QR-код успешно отправлен")
 
     async def handle_addevent_admin(self, message: Message):
         """Добавление события"""
@@ -568,7 +563,7 @@ class CustomClient(Client):
                         f"{date_str}!\n\n\n__Резервный код__:\n`{hash_code}`",
                     )
                     self.logger.info("QR-код успешно отправлен пользователю")
-                    
+
         except MessageNotModified:
             self.logger.debug("Сообщение не требует изменений")
         except Exception as e:

@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("tinkoff_acquiring.client").level = logging.ERROR
 logging.getLogger("httpx").level = logging.ERROR
 setup_logging()
-load_dotenv(override=True)
+load_dotenv(".env", override=True)
 NAME = os.getenv("NAME", "bot")
 API_ID = os.getenv("API_ID", None)
 API_HASH = os.getenv("API_HASH", None)
