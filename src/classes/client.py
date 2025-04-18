@@ -354,13 +354,19 @@ class CustomClient(Client):
     async def handle_getmyqr(self, message: Message):
         """Генерация QR-кода"""
         self.logger.info(f"Генерация QR-кода по запросу от {message.from_user.id}")
-
+        args = message.command[1:]
+        if len(args) > 0:
+            if message.from_user.id in Utils.ADMIN_IDS:
+                user_id = args[0]
+            else:
+                user_id = message.from_user.id
         self.logger.debug("Начало генерации QR-кода")
-        events = self.db.get_all_visitors(message.from_user.id)
+        events = self.db.get_all_visitors(user_id)
         if len(events) == 0:
             await message.reply("Вы не зарегистрированы ни на одно событие")
             return
         msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
+
         for i in events:
             image = await Utils.gen_qr_code(f"https://{self.me.username}?start={i[2]}")
             self.logger.debug("QR-код сгенерирован")
@@ -370,7 +376,9 @@ class CustomClient(Client):
             img_byte_arr.seek(0)
 
             await msg.delete()
-            await self.send_photo(message.chat.id, img_byte_arr, f"Ваш QR код на дискотеку {i[1]}")
+            await self.send_photo(
+                message.chat.id, img_byte_arr, f"Ваш QR код на дискотеку {i[1]}"
+            )
         self.logger.info("QR-код успешно отправлен")
 
     async def handle_genqr_admin(self, message: Message):
