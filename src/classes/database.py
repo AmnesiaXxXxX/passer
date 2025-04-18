@@ -65,7 +65,9 @@ class Database:
         query = "SELECT tg_id FROM users"
         if tg_id:
             query += " WHERE tg_id LIKE '%' || ? || '%'"
-        self.cur.execute(query, (tg_id,))
+            self.cur.execute(query, (tg_id,))
+            return self.cur.fetchall()
+        self.cur.execute(query)
         return self.cur.fetchall()
 
     def add_user(self, tg_id: str | int):
