@@ -8,7 +8,7 @@ import os
 import time
 import traceback
 from typing import Any, Callable, List, Optional, Self, Tuple, TypeVar
-
+from collections import OrderedDict
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
@@ -221,14 +221,19 @@ class CustomClient(Client):
         answer = await message.ask(
             "Введите айди или юзернейм человека для рассылки ему или `выход` для отмены"
         )
-        target_id = answer.text
+        target_id = answer.content
         answer = await message.ask(
             "Введите текст для рассылки ему или `выход` для отмены"
         )
-        target_text = f"""Сообщение от администрации:\n\n```text\n{answer.text}```"""
+        target_text = f"""Сообщение от администрации:\n\n```text\n{answer.content}```"""
         try:
-            
-            await self.send_message(target_id, target_text)
+
+            msg = await self.send_message(
+                target_id,
+                target_text,
+                entities=answer.entities,
+            )
+            await msg.edit_media(answer.media[0])
             await message.reply("Отправлено!")
         except Exception as e:
             await message.reply(
@@ -353,15 +358,15 @@ class CustomClient(Client):
         msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
         self.logger.debug("Начало генерации QR-кода")
 
-        image = await Utils.gen_qr_code(message.command[1:])
-        self.logger.debug("QR-код сгенерирован")
+        image = Utils.create_qr(message.command[1:])
 
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format="PNG")
         img_byte_arr.seek(0)
+        self.logger.info("QR-код сгенерирован")
 
-        await msg.delete()
         await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
+        await msg.delete()
         self.logger.info("QR-код успешно отправлен")
 
     async def handle_addevent_admin(self, message: Message):
@@ -560,11 +565,32 @@ class CustomClient(Client):
                     query.from_user.id,
                     date,
                 )
+                email = "example@gmail.com"
+                phone = "+71234567890"
+                reciept = {
+                    "Receipt": {
+                        "Email": email,
+                        "Phone": phone,
+                        "Taxation": "osn",
+                        "Items": [
+                            {
+                                "Name": f"Пропуск на дискотеку {date_str}",
+                                "Price": cost,
+                                "Quantity": 1,
+                                "Amount": 1,
+                                "Tax": "vat10",
+                            }
+                        ],
+                    }
+                }
+
                 r = await self.tb.init_payment(
                     cost,
                     hash(query.from_user.id + time.time()),
                     description,
+                    receipt=reciept,
                     success_url=f"https://t.me/{self.me.username}?start=activate{hash_code[:10]}",
+                    email=email,
                 )
                 self.logger.debug(f"Платеж инициализирован, URL: {r['PaymentURL']}")
 
