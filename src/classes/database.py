@@ -111,7 +111,7 @@ class Database:
         if entry_datetime is None:
             entry_datetime = datetime.now(UTC)
         hash_code = Utils.generate_hash(tg_id, entry_datetime)
-        query = "INSERT INTO visitors (tg_id, to_datetime, hash_code) VALUES (?, ?, ?)"
+        query = "INSERT INTO visitors (tg_id, to_datetime, hash_code, is_active) VALUES (?, ?, ?, 0)"
         self.cur.execute(query, (str(tg_id), to_datetime.date(), hash_code))
         return hash_code
 
@@ -137,26 +137,19 @@ class Database:
             self.cur.execute(
                 "UPDATE visitors SET is_active = 0 WHERE hash_code = ?", (hash_code,)
             )
+            return True
+        except (ValueError, IndexError) as e:
+            self.con.rollback()
+            self.logger.error(f"Ошибка при деактивации посетителя: {e}")
+            return False
 
-            # Получаем дату посетителя для обновления счетчика
+    def enable_visitor(self, hash_code: str):
+        """Деактивирует посетителя по хеш-коду (устанавливает is_active = 0)"""
+        try:
+            # Обновляем запись посетителя
             self.cur.execute(
-                "SELECT to_datetime FROM visitors WHERE hash_code = ?", (hash_code,)
+                "UPDATE visitors SET is_active = 1 WHERE hash_code = ?", (hash_code,)
             )
-            visitor_date = self.cur.fetchone()
-
-            if visitor_date:
-                # Обновляем счетчик в таблице registrations
-                self.cur.execute(
-                    """UPDATE registrations
-                    SET visitors_count = (
-                        SELECT COUNT(*)
-                        FROM visitors
-                        WHERE to_datetime = ? AND is_active = 1
-                    )
-                    WHERE date = ?""",
-                    (visitor_date[0], visitor_date[0]),
-                )
-
             self.con.commit()
             return True
         except (ValueError, IndexError) as e:

@@ -289,9 +289,9 @@ class CustomClient(Client):
                 if args[0].startswith("activate"):
                     hash_code_start = args[0][8:]
                     hash_code = self.db.check_registration_by_hash(
-                        hash_code_start, is_strict=False
+                        hash_code_start, True, False
                     )
-
+                
                     if isinstance(hash_code, bool):
                         raise Exception("Произошла ошибка!")
                     hash_code = hash_code[2]
@@ -355,11 +355,12 @@ class CustomClient(Client):
         """Генерация QR-кода"""
         self.logger.info(f"Генерация QR-кода по запросу от {message.from_user.id}")
         args = message.command[1:]
+        user_id = None
         if len(args) > 0:
             if message.from_user.id in Utils.ADMIN_IDS:
                 user_id = args[0]
-            else:
-                user_id = message.from_user.id
+        if not user_id:
+            user_id = message.from_user.id
         self.logger.debug("Начало генерации QR-кода")
         events = self.db.get_all_visitors(user_id)
         if len(events) == 0:
@@ -576,7 +577,7 @@ class CustomClient(Client):
                 )
                 if result:
                     self.logger.warning(
-                        f"Пользователь {query.from_bot.id} уже зарегистрирован на это событие"
+                        f"Пользователь {query.from_user.id} уже зарегистрирован на это событие"
                     )
                     await query.answer(
                         "❌ Вы уже были зарегистрированы на это событие!!!"
