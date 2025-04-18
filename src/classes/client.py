@@ -160,7 +160,7 @@ class CustomClient(Client):
             self.logger.error(f"Ошибка при настройке колбеков: {str(e)}", exc_info=True)
             raise
 
-    async def server_not_working(self, client, message:Message):
+    async def server_not_working(self, client, message: Message):
         await message.reply("Ведутся серверные работы", reply_to_message_id=message.id)
 
     def setup_handlers(self):
@@ -217,6 +217,24 @@ class CustomClient(Client):
             self.logger.error(f"Ошибка при проверке кода: {str(e)}", exc_info=True)
             await message.reply("❌ Произошла ошибка при проверке кода")
 
+    async def handle_sendto_admin(self, message: Message):
+        answer = await message.ask(
+            "Введите айди или юзернейм человека для рассылки ему или `выход` для отмены"
+        )
+        target_id = answer.text
+        answer = await message.ask(
+            "Введите текст для рассылки ему или `выход` для отмены"
+        )
+        target_text = f"""Сообщение от администрации:\n\n```text\n{answer.text}```"""
+        try:
+            
+            await self.send_message(target_id, target_text)
+            await message.reply("Отправлено!")
+        except Exception as e:
+            await message.reply(
+                f"При отправке персональной рассылки произошла ошибка: {e}"
+            )
+
     async def handle_sendall_admin(self, message: Message):
         """Функция рассылки сообщений"""
         self.logger.info(f"Обработка команды sendall от {message.from_user.id}")
@@ -268,7 +286,7 @@ class CustomClient(Client):
                     hash_code = self.db.check_registration_by_hash(
                         hash_code_start, is_strict=False
                     )
-                    
+
                     if isinstance(hash_code, bool):
                         raise Exception("Произошла ошибка!")
                     hash_code = hash_code[2]
@@ -294,7 +312,7 @@ class CustomClient(Client):
 
                     user = self.db.get_all_visitors(code)[0]
                     self.logger.debug(f"Результат запроса к БД: {user}")
-                    
+
                     if user:
                         if not user[3]:
                             self.logger.warning(f"Код {code} уже использован")
