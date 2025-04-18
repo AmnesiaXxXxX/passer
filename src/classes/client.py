@@ -291,7 +291,7 @@ class CustomClient(Client):
                     hash_code = self.db.check_registration_by_hash(
                         hash_code_start, True, False
                     )
-                
+
                     if isinstance(hash_code, bool):
                         raise Exception("Произошла ошибка!")
                     hash_code = hash_code[2]
@@ -573,7 +573,7 @@ class CustomClient(Client):
 
                 # Проверка существующей регистрации
                 result = self.db.check_registration_by_tgid(
-                    query.from_user.id, date.date(), is_active=False
+                    query.from_user.id, date.date(), is_active=True
                 )
                 if result:
                     self.logger.warning(
@@ -592,10 +592,17 @@ class CustomClient(Client):
                 cost = Utils.COST
                 description = "Оплата прохода в клуб"
                 self.logger.debug(f"Инициализация платежа на сумму {cost}")
-                hash_code = self.db.reg_new_visitor(
-                    query.from_user.id,
-                    date,
-                )
+                try:
+                    hash_code = self.db.reg_new_visitor(
+                        query.from_user.id,
+                        date,
+                    )
+                except AttributeError:
+                    self.db.remove("visitors", "tg_id", query.from_user.id)
+                    hash_code = self.db.reg_new_visitor(
+                        query.from_user.id,
+                        date,
+                    )
                 email = "example@gmail.com"
                 phone = "+71234567890"
                 reciept = {
@@ -614,51 +621,23 @@ class CustomClient(Client):
                         ],
                     }
                 }
+                if hash_code:
+                    r = await self.tb.init_payment(
+                        cost,
+                        hash(query.from_user.id + time.time()),
+                        description,
+                        receipt=reciept,
+                        success_url=f"https://t.me/{self.me.username}?start=activate{hash_code[:10]}",
+                        email=email,
+                    )
+                    self.logger.debug(f"Платеж инициализирован, URL: {r['PaymentURL']}")
 
-                r = await self.tb.init_payment(
-                    cost,
-                    hash(query.from_user.id + time.time()),
-                    description,
-                    receipt=reciept,
-                    success_url=f"https://t.me/{self.me.username}?start=activate{hash_code[:10]}",
-                    email=email,
-                )
-                self.logger.debug(f"Платеж инициализирован, URL: {r['PaymentURL']}")
-
-                await message.edit_text(
-                    "Виды оплаты",
-                    reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
-                )
-
-        #         if await self.tb.await_payment(r["PaymentId"]):
-        #             self.logger.info(f"Платеж {r['PaymentId']} подтвержден")
-
-        #             try:
-        #                 hash_code = self.db.reg_new_visitor(
-        #                     query.from_user.id,
-        #                     date,
-        #                 )
-        #                 self.logger.debug(f"Сгенерирован хэш-код: {hash_code}")
-        #             except AttributeError:
-        #                 self.logger.warning("Пользователь уже зарегистрирован")
-        #                 await message.edit_text(
-        #                     "`❌ Вы уже зарегистрированы на это событие!!!`",
-        #                 )
-        #                 return
-
-        #             image = await Utils.gen_qr_code(
-        #                 f"https://t.me/{self.me.username}?start={hash_code}"
-        #             )
-        #             img_byte_arr = io.BytesIO()
-        #             image.save(img_byte_arr, format="PNG")
-        #             img_byte_arr.seek(0)
-
-        #             await message.reply_photo(
-        #                 photo=img_byte_arr,
-        #                 caption=f"Ваш QR на дискотеку "
-        #                 f"{date_str}!\n\n\n__Резервный код__:\n`{hash_code}`",
-        #             )
-        #             self.logger.info("QR-код успешно отправлен пользователю")
+                    await message.edit_text(
+                        "Виды оплаты",
+                        reply_markup=ButtonsMenu.get_payment_button(
+                            r["PaymentURL"], cost
+                        ),
+                    )
 
         except MessageNotModified:
             self.logger.debug("Сообщение не требует изменений")

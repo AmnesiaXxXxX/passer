@@ -3,7 +3,7 @@
 import logging
 import sqlite3 as sql
 from datetime import UTC, date, datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from src.utils import Utils
 
@@ -186,6 +186,9 @@ class Database:
             return result
         return False
 
+    def remove(self, table: str, target: str, target_id: Any):
+        self.cur.execute("DELETE FROM ? WHERE ? == ?", (table, target, target_id))
+
     def check_registration_by_tgid(
         self,
         tg_id: int | str,
@@ -193,10 +196,9 @@ class Database:
         is_active: bool | None = True,
     ):
         """Проверка записан ли пользователь на ивент по тг айди"""
-        query = "SELECT * FROM visitors WHERE tg_id = ? AND to_datetime = ?"
+        query = "SELECT hash_code FROM visitors WHERE tg_id = ? AND to_datetime = ?"
         if isinstance(is_active, bool):
             query += f" AND is_active = {1 if is_active else 0}"
-
         self.cur.execute(
             query,
             (
@@ -204,8 +206,10 @@ class Database:
                 to_datetime,
             ),
         )
-
-        return len(self.cur.fetchall()) > 0
+        result = self.cur.fetchone()
+        if result:
+            return str(result[0])
+        return False
 
     def get_events(self, display_all: bool = False, show_old: bool = True):
         """Функция получения всех ивентов"""

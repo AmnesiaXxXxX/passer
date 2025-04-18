@@ -1,12 +1,12 @@
 """Модуль кнопок меню"""
 
-from typing import List, Union
 from datetime import datetime
+from typing import List, Union
 
 from pyrogram.types import (
     InlineKeyboardButton,
-    InlineKeyboardMarkup,
     InlineKeyboardButtonBuy,
+    InlineKeyboardMarkup,
 )
 
 from src.classes.database import Database
@@ -40,13 +40,12 @@ class ButtonsMenu:
         db = Database()
         check = db.check_registration_by_tgid
         buttons: List[Union[InlineKeyboardButton, InlineKeyboardButtonBuy]] = []
-
         for date in db.get_events(display_all=True, show_old=False):
             available = db.get_available_slots(date[0])
             button_text = (
                 f"{datetime.strptime(date[0], Utils.DATE_FORMAT).strftime('%d.%m.%Y')}"
                 f"({available} {ButtonsMenu.decline_tickets(available)})"
-                f"{'✅' if check(tg_id, date[0], is_active=None) else ''}"
+                f"{'✅' if check(tg_id, date[0], is_active=True) else ''}"
             )
             callback_text = (
                 f"reg_user_to_{date[0]}" if date[2] - date[1] > 0 else "reg_error"
@@ -71,7 +70,7 @@ class ButtonsMenu:
                 [
                     InlineKeyboardButton("Отправить", f"send_{tg_id}"),
                     InlineKeyboardButton("Отмена", "send_cancel"),
-                ],
+                ]
             ]
         )
 
@@ -99,7 +98,6 @@ class ButtonsMenu:
                         f"Оплатить с помощью Т-Банк ({cost} р.)", url=payment_url
                     )
                 ],
-                [ButtonsMenu.get_menu()],
             ]
         )
 
