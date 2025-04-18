@@ -1,9 +1,10 @@
 """Модуль базы данных"""
 
+import logging
 import sqlite3 as sql
 from datetime import UTC, date, datetime
 from typing import List, Optional
-import logging
+
 from src.utils import Utils
 
 
@@ -77,7 +78,7 @@ class Database:
                 self.cur.execute(query, (str(tg_id),))
                 self.logger.info(f"Добавление в бд users пользователя {tg_id}")
                 return True
-        except IndexError as e:
+        except IndexError:
             return False
 
     def reg_new_visitor(

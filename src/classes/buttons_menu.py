@@ -3,12 +3,10 @@
 from typing import List, Union
 from datetime import datetime
 
-from pyrogram.client import Client
 from pyrogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButtonBuy,
-    Message,
 )
 
 from src.classes.database import Database
@@ -72,7 +70,7 @@ class ButtonsMenu:
             [
                 [
                     InlineKeyboardButton("Отправить", f"send_{tg_id}"),
-                    InlineKeyboardButton("Отмена", f"send_cancel"),
+                    InlineKeyboardButton("Отмена", "send_cancel"),
                 ],
             ]
         )

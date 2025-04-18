@@ -5,7 +5,7 @@ import os
 
 from dotenv import load_dotenv
 
-from src.classes.client import CustomClient as Client
+from src.classes.client import CustomClient as CClient
 from src.logger import setup_logging
 
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +18,7 @@ API_ID = os.getenv("API_ID", None)
 API_HASH = os.getenv("API_HASH", None)
 BOT_TOKEN = os.getenv("BOT_TOKEN", None)
 
-app = Client(NAME, API_ID, API_HASH, BOT_TOKEN)
+app = CClient(NAME, API_ID, API_HASH, BOT_TOKEN)
 
 
 if __name__ == "__main__":

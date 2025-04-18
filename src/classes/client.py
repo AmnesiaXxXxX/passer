@@ -7,7 +7,7 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Callable, List, Optional, Self, Tuple, TypeVar
+from typing import Any, Callable, List, Optional, Tuple, TypeVar
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -60,7 +60,7 @@ class CustomClient(Client):
                 api_hash,
                 bot_token=bot_token,
                 workers=28,
-                max_concurrent_transmissions=0,
+                max_concurrent_transmissions=200,
             )
 
             self.setup_handlers()
@@ -311,6 +311,28 @@ class CustomClient(Client):
                     f"Не удалось отправить сообщение об ошибке: {str(send_error)}"
                 )
 
+    async def handle_getmyqr(self, message: Message):
+        """Генерация QR-кода"""
+        self.logger.info(f"Генерация QR-кода по запросу от {message.from_user.id}")
+
+        self.logger.debug("Начало генерации QR-кода")
+        events = self.db.get_all_visitors(message.from_user.id)
+        if len(events) == 0:
+            await message.reply("Вы не зарегистрированы ни на одно событие")
+            return
+        msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
+        for i in events:
+            image = await Utils.gen_qr_code(f"https://{self.me.username}?start={i[2]}")
+            self.logger.debug("QR-код сгенерирован")
+
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format="PNG")
+            img_byte_arr.seek(0)
+
+            await msg.delete()
+            await self.send_photo(message.chat.id, img_byte_arr, f"Ваш QR код на дискотеку {i[1]}")
+        self.logger.info("QR-код успешно отправлен")
+
     async def handle_genqr_admin(self, message: Message):
         """Генерация QR-кода"""
         self.logger.info(f"Генерация QR-кода по запросу от {message.from_user.id}")
@@ -326,7 +348,7 @@ class CustomClient(Client):
         img_byte_arr.seek(0)
 
         await msg.delete()
-        await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
+        await super().send_photo(message.chat.id, img_byte_arr)
         self.logger.info("QR-код успешно отправлен")
 
     async def handle_addevent_admin(self, message: Message):
@@ -570,5 +592,5 @@ class CustomClient(Client):
             self.logger.error(f"Ошибка в обработчике callback: {str(e)}", exc_info=True)
             try:
                 await query.answer("❌ Произошла ошибка, попробуйте позже")
-            except:
+            except Exception as e:
                 pass
