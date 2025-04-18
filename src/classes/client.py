@@ -166,8 +166,6 @@ class CustomClient(Client):
     def setup_handlers(self):
         """Настройка хендлеров с автоматической обработкой ошибок"""
         # self.logger.info("Настройка обработчиков сообщений...")
-        self.add_handler(MessageHandler(self.server_not_working))
-        return
         try:
             _, self_functions = self.get_functions()
 
