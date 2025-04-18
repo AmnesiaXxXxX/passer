@@ -264,17 +264,39 @@ class CustomClient(Client):
 
             args = message.command[1:]
 
-            # Обработка админских команд
-            if args and message.from_user.id in Utils.ADMIN_IDS:
-                self.logger.info(f"Админская команда от {user_info}")
+            if args:
+                if args[0].startswith("activate"):
+                    hash_code_start = args[0][8:]
+                    hash_code = self.db.check_registration_by_hash(
+                        hash_code_start, is_strict=False
+                    )
+                    
+                    if isinstance(hash_code, bool):
+                        raise Exception("Произошла ошибка!")
+                    hash_code = hash_code[2]
+                    image = await Utils.gen_qr_code(
+                        f"https://t.me/{self.me.username}?start={hash_code}"
+                    )
+                    img_byte_arr = io.BytesIO()
+                    image.save(img_byte_arr, format="PNG")
+                    img_byte_arr.seek(0)
 
-                try:
+                    await message.reply_photo(
+                        photo=img_byte_arr,
+                        caption=f"Ваш QR на дискотеку "
+                        f"!\n\n\n__Резервный код__:\n`{hash_code}`",
+                    )
+                    self.logger.info("QR-код успешно отправлен пользователю")
+                    return
+                if message.from_user.id in Utils.ADMIN_IDS:
+                    self.logger.info(f"Админская команда от {user_info}")
+
                     code = args[0]
                     self.logger.debug(f"Проверка кода: {code}")
 
-                    user = self.db.get_all_visitors(code)
+                    user = self.db.get_all_visitors(code)[0]
                     self.logger.debug(f"Результат запроса к БД: {user}")
-
+                    
                     if user:
                         if not user[3]:
                             self.logger.warning(f"Код {code} уже использован")
@@ -289,14 +311,7 @@ class CustomClient(Client):
                     else:
                         self.logger.warning(f"Неверный код: {code}")
                         await message.reply(Utils.FALSE_CODE)
-
-                except Exception as e:
-                    self.logger.error(
-                        f"Ошибка в админской команде: {str(e)}", exc_info=True
-                    )
-                    await message.reply(Utils.FALSE_CODE)
-                return
-
+                    return
             # Обычный ответ для пользователей
             await message.reply(
                 Utils.START_MESSAGE,
@@ -525,11 +540,15 @@ class CustomClient(Client):
                 cost = Utils.COST
                 description = "Оплата прохода в клуб"
                 self.logger.debug(f"Инициализация платежа на сумму {cost}")
-
+                hash_code = self.db.reg_new_visitor(
+                    query.from_user.id,
+                    date,
+                )
                 r = await self.tb.init_payment(
                     cost,
                     hash(query.from_user.id + time.time()),
                     description,
+                    success_url=f"https://t.me/{self.me.username}?start=activate{hash_code[:10]}",
                 )
                 self.logger.debug(f"Платеж инициализирован, URL: {r['PaymentURL']}")
 
@@ -538,35 +557,35 @@ class CustomClient(Client):
                     reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
                 )
 
-                while await self.tb.await_payment(r["PaymentId"]):
-                    self.logger.info(f"Платеж {r['PaymentId']} подтвержден")
+        #         if await self.tb.await_payment(r["PaymentId"]):
+        #             self.logger.info(f"Платеж {r['PaymentId']} подтвержден")
 
-                    try:
-                        hash_code = self.db.reg_new_visitor(
-                            query.from_user.id,
-                            date,
-                        )
-                        self.logger.debug(f"Сгенерирован хэш-код: {hash_code}")
-                    except AttributeError:
-                        self.logger.warning("Пользователь уже зарегистрирован")
-                        await message.edit_text(
-                            "`❌ Вы уже зарегистрированы на это событие!!!`",
-                        )
-                        return
+        #             try:
+        #                 hash_code = self.db.reg_new_visitor(
+        #                     query.from_user.id,
+        #                     date,
+        #                 )
+        #                 self.logger.debug(f"Сгенерирован хэш-код: {hash_code}")
+        #             except AttributeError:
+        #                 self.logger.warning("Пользователь уже зарегистрирован")
+        #                 await message.edit_text(
+        #                     "`❌ Вы уже зарегистрированы на это событие!!!`",
+        #                 )
+        #                 return
 
-                    image = await Utils.gen_qr_code(
-                        f"https://t.me/{self.me.username}?start={hash_code}"
-                    )
-                    img_byte_arr = io.BytesIO()
-                    image.save(img_byte_arr, format="PNG")
-                    img_byte_arr.seek(0)
+        #             image = await Utils.gen_qr_code(
+        #                 f"https://t.me/{self.me.username}?start={hash_code}"
+        #             )
+        #             img_byte_arr = io.BytesIO()
+        #             image.save(img_byte_arr, format="PNG")
+        #             img_byte_arr.seek(0)
 
-                    await message.reply_photo(
-                        photo=img_byte_arr,
-                        caption=f"Ваш QR на дискотеку "
-                        f"{date_str}!\n\n\n__Резервный код__:\n`{hash_code}`",
-                    )
-                    self.logger.info("QR-код успешно отправлен пользователю")
+        #             await message.reply_photo(
+        #                 photo=img_byte_arr,
+        #                 caption=f"Ваш QR на дискотеку "
+        #                 f"{date_str}!\n\n\n__Резервный код__:\n`{hash_code}`",
+        #             )
+        #             self.logger.info("QR-код успешно отправлен пользователю")
 
         except MessageNotModified:
             self.logger.debug("Сообщение не требует изменений")

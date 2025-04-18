@@ -172,14 +172,22 @@ class Database:
         result = self.cur.fetchone()
         return result[0] if result else 0
 
-    def check_registration_by_hash(self, hash_code: str, is_active: bool = False):
+    def check_registration_by_hash(
+        self, hash_code: str, is_active: bool = False, is_strict: bool = True
+    ):
         """Проверка записан ли пользователь на ивент по хешу"""
-        query = "SELECT * FROM visitors WHERE hash_code = ?"
+        query = "SELECT * FROM visitors"
+        match is_strict:
+            case True:
+                query += " WHERE hash_code = ?"
+            case False:
+                query += f" WHERE hash_code LIKE '%' || ? || '%'"
         if is_active:
             query += " AND is_active == 1"
         self.cur.execute(query, (hash_code,))
-        if bool(self.cur.fetchone()):
-            return True
+        result = self.cur.fetchone()
+        if bool(result):
+            return result
         return False
 
     def check_registration_by_tgid(
