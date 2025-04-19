@@ -289,12 +289,14 @@ class CustomClient(Client):
                 if args[0].startswith("activate"):
                     hash_code_start = args[0][8:]
                     hash_code = self.db.check_registration_by_hash(
-                        hash_code_start, True, False
+                        hash_code_start, False, False
                     )
 
                     if isinstance(hash_code, bool):
                         raise Exception("Произошла ошибка!")
                     hash_code = hash_code[2]
+                    self.db.enable_visitor(hash_code)
+
                     image = await Utils.gen_qr_code(
                         f"https://t.me/{self.me.username}?start={hash_code}"
                     )
@@ -312,25 +314,27 @@ class CustomClient(Client):
                 if message.from_user.id in Utils.ADMIN_IDS:
                     self.logger.info(f"Админская команда от {user_info}")
 
-                    code = args[0]
-                    self.logger.debug(f"Проверка кода: {code}")
+                    hash_code = args[0]
+                    self.logger.debug(f"Проверка кода: {hash_code}")
 
-                    user = self.db.get_all_visitors(code)[0]
+                    user = self.db.get_all_visitors(hash_code)
+                    if len(user) > 0:
+                        user = user[0]
                     self.logger.debug(f"Результат запроса к БД: {user}")
 
                     if user:
                         if not user[3]:
-                            self.logger.warning(f"Код {code} уже использован")
+                            self.logger.warning(f"Код {hash_code} уже использован")
                             await message.reply(Utils.FALSE_CODE_ALREADY_USED)
                             return
 
-                        self.db.disable_visitor(user[2])
-                        self.logger.info(f"Код {code} деактивирован")
+                        self.db.delete_visitor(hash_code=hash_code)
+                        self.logger.info(f"Код {hash_code} деактивирован")
 
                         await message.reply(Utils.TRUE_CODE)
                         await message.delete()
                     else:
-                        self.logger.warning(f"Неверный код: {code}")
+                        self.logger.warning(f"Неверный код: {hash_code}")
                         await message.reply(Utils.FALSE_CODE)
                     return
             # Обычный ответ для пользователей
@@ -397,7 +401,7 @@ class CustomClient(Client):
         self.logger.info("QR-код сгенерирован")
 
         await msg.delete()
-        await super().send_photo(message.chat.id, img_byte_arr)
+        await self.send_photo(message.chat.id, img_byte_arr)
         self.logger.info("QR-код успешно отправлен")
 
     async def handle_addevent_admin(self, message: Message):
@@ -598,7 +602,7 @@ class CustomClient(Client):
                         date,
                     )
                 except AttributeError:
-                    self.db.remove("visitors", "tg_id", query.from_user.id)
+                    self.db.delete_visitor(tg_id = query.from_user.id, to_datetime=date)
                     hash_code = self.db.reg_new_visitor(
                         query.from_user.id,
                         date,

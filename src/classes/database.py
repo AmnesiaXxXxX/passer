@@ -3,7 +3,7 @@
 import logging
 import sqlite3 as sql
 from datetime import UTC, date, datetime
-from typing import Any, List, Optional
+from typing import Any, List, Optional, overload
 
 from src.utils import Utils
 
@@ -116,19 +116,27 @@ class Database:
         return hash_code
 
     def delete_visitor(
-        self, tg_id: int | str, to_datetime: Optional[datetime | str] = None
+        self,
+        *,
+        tg_id: Optional[int | str] = None,
+        to_datetime: Optional[datetime | str] = None,
+        hash_code: Optional[str] = None,
     ) -> None:
         """
         Удаляет пользователя из базы данных.
         Если задан to_datetime, удаляет запись с указанными tg_id и to_datetime.
         Иначе удаляются все записи с указанным tg_id.
         """
-        if to_datetime is None:
-            query = "DELETE FROM visitors WHERE tg_id=?"
-            self.cur.execute(query, (str(tg_id),))
-        else:
-            query = "DELETE FROM visitors WHERE tg_id=? AND to_datetime=?"
-            self.cur.execute(query, (str(tg_id), to_datetime))
+        if tg_id:
+            if to_datetime is None:
+                query = "DELETE FROM visitors WHERE tg_id=?"
+                self.cur.execute(query, (str(tg_id),))
+            else:
+                query = "DELETE FROM visitors WHERE tg_id=? AND to_datetime=?"
+                self.cur.execute(query, (str(tg_id), to_datetime))
+        elif hash_code:
+            query = "DELETE FROM visitors WHERE hash_code=?"
+            self.cur.execute(query, (str(hash_code),))
 
     def disable_visitor(self, hash_code: str):
         """Деактивирует посетителя по хеш-коду (устанавливает is_active = 0)"""
