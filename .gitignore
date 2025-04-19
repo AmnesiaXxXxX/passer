@@ -11,6 +11,7 @@ dump*
 .vscode/
 database.db
 *.env
+dumps/
 # Distribution / packaging
 .Python
 build/

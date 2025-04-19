@@ -2,8 +2,10 @@
 
 import logging
 import sqlite3 as sql
+import asyncio
+import os
 from datetime import UTC, date, datetime
-from typing import Any, List, Optional, overload
+from typing import Any, List, Optional
 
 from src.utils import Utils
 
@@ -15,7 +17,34 @@ class Database:
         self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
         self.cur = self.con.cursor()
         self.logger = logging.getLogger("database")
-        self.create_tables()  # Добавлено: создание таблиц при старте
+        self.create_tables()
+        asyncio.create_task(self.scheduled_dumps())
+
+    async def scheduled_dumps(self):
+        """Асинхронная задача для создания дампов каждый час"""
+        while True:
+            try:
+                await self.create_dump()
+                self.logger.info("Успешно создан дамп базы данных")
+            except Exception as e:
+                self.logger.error(f"Ошибка при создании дампа: {e}")
+
+            # Ждем 1 час перед следующим дампом
+            await asyncio.sleep(3600)
+
+    async def create_dump(self):
+        """Создает дамп базы данных в папке dumps"""
+        # Создаем папку dumps если ее нет
+        os.makedirs("dumps", exist_ok=True)
+
+        # Формируем имя файла с текущей датой и временем
+        timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
+        dump_filename = f"dumps/{timestamp}.sql"
+
+        # Создаем дамп
+        with open(dump_filename, "w", encoding="utf-8") as f:
+            for line in self.con.iterdump():
+                f.write(f"{line}\n")
 
     def create_tables(self):
         """Создание таблиц"""
