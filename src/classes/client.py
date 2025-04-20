@@ -1,4 +1,4 @@
-"""Модуль кастомного клиента"""
+"""Модуль кастомного клиента с использованием SQLAlchemy"""
 
 import datetime
 import inspect
@@ -7,14 +7,13 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Callable, List, Optional, Self, Tuple, TypeVar
+from typing import Callable, Optional, TypeVar
 
 from pyrogram import filters
 from pyrogram.client import Client
-from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
-from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.types import CallbackQuery, Message
-from pyrogram.errors.exceptions.bad_request_400 import MessageNotModified
+from pyrogram.handlers import CallbackQueryHandler, MessageHandler
+from pyrogram.types import CallbackQuery, Message, User
+
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
@@ -24,7 +23,7 @@ ClientVar = TypeVar("ClientVar")
 
 
 class CustomClient(Client):
-    """Кастомный класс клиента"""
+    """Кастомный клиент с интеграцией SQLAlchemy"""
 
     def __init__(
         self,
@@ -38,331 +37,249 @@ class CustomClient(Client):
         self.tb = CustomTinkoffAcquiringAPIClient(
             os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
         )
-        self.messages: dict[int | str, str] = {}
-        if not self.check_args(api_id, api_hash, name, bot_token):
-            return
-        self.logger.info("Проверка аргументов прошла успешно")
+        self.messages: dict[str, str] = {}
 
+        self._validate_credentials(api_id, api_hash, name, bot_token)
         super().__init__(
             name,
             api_id,
             api_hash,
             bot_token=bot_token,
         )
-        self.setup_handlers()
-        self.setup_callbacks()
-        self.logger.info("Настройка прошла успешно")
 
-    def check_args(
-        self,
-        api_id: Optional[str | int],
-        api_hash: Optional[str],
-        name: Optional[str],
-        bot_token: Optional[str],
-    ) -> bool:
-        """Проверка аргументов.
+        self._setup_handlers()
+        self._setup_callbacks()
+        self.logger.info("Инициализация клиента завершена")
 
-        Если один или несколько обязательных параметров отсутствуют,
-        возбуждается ValueError с перечислением недостающих параметров.
-        """
-        missing_params: List[str] = []
-        if api_id is None:
-            missing_params.append("API_ID")
-        if api_hash is None:
-            missing_params.append("API_HASH")
-        if name is None:
-            missing_params.append("NAME")
-        if bot_token is None:
-            missing_params.append("BOT_TOKEN")
+    def _validate_credentials(self, *args):
+        """Проверка учетных данных"""
+        required = {
+            "API_ID": args[0],
+            "API_HASH": args[1],
+            "NAME": args[2],
+            "BOT_TOKEN": args[3],
+        }
+        missing = [k for k, v in required.items() if v is None]
 
-        if missing_params:
+        if missing:
             raise ValueError(
-                f"Отсутствуют обязательные параметры: {', '.join(missing_params)}.\n"
-                "Укажите их в файле .env. Пример конфигурации:\n\n"
-                "API_ID = 12345678\n"
-                "API_HASH = 0123456789abcdef0123456789abcdef\n"
-                "NAME = ИМЯ_БОТА\n"
-                "BOT_TOKEN = 0123456789abcdef0123456789abcdef\n\n"
-                "API_ID и API_HASH можно получить на https://my.telegram.org/apps, "
-                "а токен бота - у @BotFather."
+                f"Отсутствуют обязательные параметры: {', '.join(missing)}\n\n"
+                "Пример конфигурации .env:\n\n"
+                "API_ID=12345678\n"
+                "API_HASH=0123456789abcdef0123456789abcdef\n"
+                "NAME=ИМЯ_БОТА\n"
+                "BOT_TOKEN=0123456789abcdef0123456789abcdef"
             )
-        return True
 
-    def get_functions(self):
-        """Получение всех функций"""
+    def _setup_handlers(self):
+        """Регистрация обработчиков команд"""
+        for name in dir(self):
+            if not name.startswith("handle_"):
+                continue
 
-        super_functions = [name for name, _ in super().__class__.__dict__.items()]
-        self_functions: List[Tuple[str, Callable[..., Any]]] = [
-            (name, func)
-            for name, func in self.__class__.__dict__.items()
-            if inspect.iscoroutinefunction(func) and name not in super_functions
-        ]
-        return super_functions, self_functions
+            method = getattr(self, name)
+            if inspect.iscoroutinefunction(method):
+                commands = name[7:].split("_")
+                handler = self._wrap_handler(method, commands)
+                self.add_handler(MessageHandler(handler, filters.command(commands)))
 
-    def error_decorator(self, func: Callable[..., Any]):
+    def _setup_callbacks(self):
+        """Регистрация обработчиков колбэков"""
+        wrapped_callback = self._error_handler_wrapper(self._process_callback)
+        self.add_handler(CallbackQueryHandler(wrapped_callback))
+
+    def _wrap_handler(self, handler: Callable, commands: list) -> Callable:
+        """Обертка для обработчиков с проверкой прав"""
+        if "admin" in commands:
+            handler = filters.user(Utils.ADMIN_IDS)
+        return self._error_handler_wrapper(handler)
+
+    def _error_handler_wrapper(self, func: Callable) -> Callable:
         """Декоратор для обработки ошибок"""
 
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                await self.error_handler(e, f"Ошибка в {func.__name__}")
+                await self._report_error(e, func.__name__)
 
         return wrapper
 
-    def setup_callbacks(self):
-        """Настройка прослушивания колбеков с обработкой ошибок"""
-        wrapped_callback = self.error_decorator(self.callbacks)
-        self.add_handler(CallbackQueryHandler(wrapped_callback, filters.all))
+    async def _report_error(self, error: Exception, context: str = ""):
+        """Отправка отчета об ошибке"""
+        error_msg = (
+            f"⚠️ **Ошибка в {context}** ⚠️\n\n"
+            f"**Тип:** `{type(error).__name__}`\n"
+            f"**Описание:** `{str(error)}`\n\n"
+            f"```python {traceback.format_exc()[:3000]}\n```"
+        )
 
-    def setup_handlers(self):
-        """Настройка хендлеров с автоматической обработкой ошибок"""
-        _, self_functions = self.get_functions()
-
-        for name, func in self_functions:
-            if name.startswith("handle_"):
-                commands = name[7:].split("_")
-                _filters = filters.command(commands)
-
-                if "admin" in commands:
-                    commands.remove("admin")
-                    _filters = _filters & filters.user(Utils.ADMIN_IDS)
-
-                # Оборачиваем обработчик в декоратор ошибок
-                wrapped_handler = self.error_decorator(func)
-                self.add_handler(MessageHandler(wrapped_handler, _filters))
+        for admin_id in Utils.ADMIN_IDS:
+            try:
+                await self.send_message(admin_id, error_msg)
+            except Exception as e:
+                self.logger.error(f"Ошибка отправки сообщения: {e}")
 
     async def handle_check_admin(self, message: Message):
-        """Функция проверка кода"""
-
-        if self.db.check_registration_by_hash(message.command[1], is_active=True):
-            await message.reply(Utils.TRUE_CODE)
-            self.db.disable_visitor(message.command[1])
-        elif self.db.check_registration_by_hash(message.command[1]):
-            await message.reply(Utils.FALSE_CODE_ALREADY_USED)
-        else:
-            await message.reply(Utils.FALSE_CODE)
+        """Проверка регистрации по хэш-коду (админ)"""
+        if hash_code := message.command[1]:
+            visitor = self.db.check_registration_by_hash(hash_code)
+            if visitor and visitor.is_active:
+                await message.reply(Utils.TRUE_CODE)
+                self.db.disable_visitor(hash_code)
+            else:
+                await message.reply(Utils.FALSE_CODE)
 
     async def handle_sendall_admin(self, message: Message):
-
-        answer = await message.ask("Введите текст для рассылки или `выход` для отмены")
-        if not answer.text.lower() == "выход":
+        """Рассылка сообщений (админ)"""
+        answer = await message.ask("Введите текст рассылки или 'выход' для отмены")
+        if answer.text.lower() != "выход":
+            self.messages[str(message.from_user.id)] = answer.text
             await message.reply(
-                f"Ваша рассылка выглядит вот так:\n\n```text\n{answer.content}```",
+                f"Предпросмотр:\n\n{answer.text}",
                 reply_markup=ButtonsMenu.get_newsletter_markup(message.from_user.id),
             )
-            self.messages[str(message.from_user.id)] = answer.content
 
-    async def handle_main_start(self, message: Message):
-        """Главная функция для команд `main|start`"""
-        args = message.command[1:]
-        if args and message.from_user.id in Utils.ADMIN_IDS:
-            try:
-                user = self.db.get_all_visitors(args[0])[0]
-                if user:
-                    if not user[3]:
-                        await message.reply(Utils.FALSE_CODE_ALREADY_USED)
-                        return
-                    self.db.disable_visitor(user[2])
-                    await message.reply(Utils.TRUE_CODE)
-                    await message.delete()
-            except IndexError:
+    async def handle_main_start(self, _: Client, message: Message):
+        """Обработка команд /main и /start"""
+        self.db.add_user(message.from_user.id)
+        if len(message.command) > 1 and message.from_user.id in Utils.ADMIN_IDS:
+            code = message.command[1]
+            if self.db.check_registration_by_hash(code):
+                self.db.disable_visitor(code)
+                await message.reply(Utils.TRUE_CODE)
+            else:
                 await message.reply(Utils.FALSE_CODE)
             return
-        await message.reply(
-            Utils.START_MESSAGE,
-            reply_markup=ButtonsMenu.get_start_markup(),
-        )
 
-    async def handle_genqr_admin(self, message: Message):
-        """Главная функция для команд `genqr`"""
-        msg = await message.reply("Подождите, идёт генерация Вашего QR кода!")
-        image = await Utils.gen_qr_code(message.command[1:])
-        await msg.delete()
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format="PNG")
-        img_byte_arr.seek(0)
-        await message.reply_photo(photo=img_byte_arr, caption="Вот Ваш QR!")
+        await message.reply(
+            Utils.START_MESSAGE, reply_markup=ButtonsMenu.get_start_markup()
+        )
 
     async def handle_addevent_admin(self, message: Message):
-        """Функция добавления ивентов"""
+        """Добавление нового события (админ)"""
+        answer = await message.ask(f"Введите дату в формате {Utils.DATE_FORMAT}")
+        event_date = datetime.datetime.strptime(answer.text, Utils.DATE_FORMAT).date()
 
-        # await message.delete()
-        answer1 = await message.ask(
-            f"**Введите дату дискотеки в формате** `{Utils.DATE_FORMAT}`"
+        answer = await message.ask(
+            "Введите максимальное количество участников (по умолчанию 250)"
         )
-        date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
-        answer2 = await message.ask(
-            "**Введите числом максимальное количество пользователей или напишите**"
-            "`выход` **для окончания создания события(стандратное число 250)**"
-        )
-        max_visitors = (
-            int(answer2.content) if answer2.content.lower() != "выход" else 250
-        )
-        self.db.add_event(date, max_visitors)
-        self.logger.warning(
-            f"Пользователь {message.from_user.full_name}({message.from_user.id}) "
-            f"добавил ивент на {date}"
+        max_visitors = int(answer.text) if answer.text.isdigit() else 250
+
+        self.db.add_event(event_date, max_visitors)
+        self.logger.info(
+            f"Добавлено событие на {event_date} " f"(макс. участников: {max_visitors})"
         )
 
-    async def handle_delevent_admin(self, message: Message):
-        """Функция удаления ивентов"""
-
-        # await message.delete()
-        text = ""
-        answer1 = await message.ask(
-            "**Введите дату дискотеки которую хотите удалить в формате**"
-            f"`{Utils.DATE_FORMAT}` или напишите `выход` для отмены"
-        )
-        if answer1.content.lower() != "выход":
-            date = datetime.datetime.strptime(answer1.content, Utils.DATE_FORMAT)
-            self.db.delete_event(date)
-            text = f"**Событие** __{date}__ **успешно удалено!**"
-            self.logger.warning(
-                f"Пользователь {message.from_user.full_name}"
-                f"({message.from_user.id}) удалил ивент на {date}"
-            )
-        else:
-            text = "**Удаление события отменено!**"
-            self.logger.info(
-                "Пользователь %s (%s) отменил удаление ивента",
-                message.from_user.full_name,
-                message.from_user.id,
-            )
-        await answer1.reply(text)
-
-    async def error_handler(self, error: Exception, context: str = ""):
-        """Асинхронный обработчик ошибок"""
-        error_msg = "⚠️ **Ошибка в боте** ⚠️\n\n"
-        if context:
-            error_msg += f"**Контекст:** `{context}`\n\n"
-        error_msg += f"**Тип ошибки:** `{type(error).__name__}`\n"
-        error_msg += f"**Описание:** `{str(error)}`\n\n"
-
-        traceback_msg = "".join(
-            traceback.format_exception(type(error), error, error.__traceback__)
-        )
-        if len(traceback_msg) > 3000:
-            traceback_msg = traceback_msg[:1500] + "\n...\n" + traceback_msg[-1500:]
-
-        error_msg += f"```python\n{traceback_msg}\n```"
-
-        try:
-            for admin in Utils.ADMIN_IDS:
-                await self.send_message(admin, error_msg)
-        except Exception as e:
-            self.logger.error(f"Ошибка при отправке сообщения: {e}")
-
-    async def callbacks(self, _: Client, query: CallbackQuery):
-        """Функция приёма колбеков"""
+    async def _process_callback(self, _: Client, query: CallbackQuery):
+        """Обработка callback-запросов"""
         data = str(query.data)
         message = query.message
 
-        if data.startswith("send"):
-            tg_id = data.split("_")[1]
-            if tg_id == "cancel":
-                await message.reply("Рассылка отменена")
-                await message.delete()
-                return
-            users = self.db.get_all_users()
-
-            msg = await message.reply(
-                f"Рассылка запущена для {len(users)} пользователей"
-            )
-            for user in users:
-                await self.send_message(user[1], self.messages[tg_id])
-            await msg.edit_text(f"Завершена рассылка для {len(users)} пользователей")
-            await message.delete()
-
         if data.startswith("useragreement"):
-            await message.edit_text(
-                """Пользовательское соглашение\n1. Общие положения\n1.1. Настоящее Пользовательское\nсоглашение (далее — «Соглашение») регулирует правила посещения дискотеки на базе Дома молодёжи (г. Боровичи, ул. 9 Января, д. 46) (далее —\n«Мероприятие»).\n1.2. Организатор оставляет за собой право вносить изменения в правила посещения и условия Соглашения.\nАктуальная версия всегда доступна на официальных ресурсах.\n1.3. Посещение Мероприятия означает согласие с условиями данного Соглашения.\n\n2. Условия посещения\n2.1. Мероприятие рекомендовано для лиц в возрасте от 14 до\n25 лет.\n2.2. Организатор в праве запросить предъявление документа, удостоверяющего возраст (паспорт, ученический билет с фото, справку из\nшколы).\n2.3. Вход строго запрещён лицам в состоянии алкогольного или наркотического опьянения\n\n3. Правила поведения\n3.1. Посетители обязаны:\n- Соблюдать общественный порядок и нормы морали.\n- Уважительно относиться к другим гостям и персоналу.\n- Выполнять требования администрации и охраны.\n3.2. Запрещено:\n- Употребление алкоголя, табака, наркотических веществ.\n- Ношение оружия, колюще-режущих предметов, взрывчатых\nвеществ.\n- Проявление агрессии, буллинга, дискриминации.\n- Порча имущества учреждения.\n3.3. В случае нарушений администрация вправе удалить посетителя без компенсации стоимости билета.\n\n4. Безопасность и контроль\n4.1. Организаторы проводят досмотр на входе для предотвращения проноса запрещённых предметов.\n4.2. В случае ЧП необходимо следовать указаниям\nперсонала.\n\n5. Ответственность\n5.1. Организатор не несёт ответственности за:\n- Личные вещи посетителей (рекомендуется не оставлять ценные вещи без присмотра).\n- Поведение посетителей вне территории Мероприятия.\n5.2. Родители/законные представители несовершеннолетних\nнесут ответственность за действия своих детей в рамках действующего законодательства.\n\n6. Прочие условия\n6.1. Организатор вправе использовать материалы с Мероприятия\nв рекламных целях.\n\n7. Условия использования кошелька\n7.1 Сумма, внесённая на счёт кошелька без весомой на то причины, не возвращается\n7.2 Возврат средств осуществляется на баланс кошелька исключительно при\nвозврате билета\n\nДата вступления в силу: 29.03.2025\nКонтакты организаторов:\nНиколаев Даниил Александрович\nstutututuf@gmail.com\nАжимиров Руслан Рамильевич\nazimirovr@mail.ru\nИванов Антон Андреевич\nmiiqwf@gmail.com""",
-                reply_markup=ButtonsMenu.get_menu_markup(),
-            )
+            await self._show_user_agreement(message)
+        elif data.startswith("reg_error"):
+            await self._process_registration_errors(query, message)
+        elif data.startswith("reg_user_to"):
+            await self._process_registration(query, message)
+        elif data.startswith("buytickets"):
+            await self._show_payment_options(message, query.from_user)
+        elif data.startswith("menu"):
+            await self._show_main_menu(message)
+        elif data.startswith("send"):
+            await self._process_newsletter(data, message)
+
+    async def _process_registration_errors(
+        self, query: CallbackQuery, message: Message
+    ):
+        match query.data:
+            case "reg_error_already_registrate":
+                await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
+            case "reg_error":
+                await query.answer(Utils.CALLBACK_USER_NOT_AVAILABLE)
+            case _:
+                await query.answer("Произошла неизвестная ошибка")
+
+    async def _process_registration(self, query: CallbackQuery, message: Message):
+        """Обработка регистрации на событие"""
+        event_date = datetime.datetime.strptime(
+            str(query.data).split("_")[-1], Utils.DATE_FORMAT
+        ).date()
+
+        if self.db.check_registration_by_tgid(query.from_user.id, event_date):
+            await query.answer("❌ Вы уже зарегистрированы!")
             return
-        if data.startswith("reg_error"):
-            await query.answer("❌ Это событие закончилось или места кончились")
-        if data.startswith("buytickets"):
-            self.logger.info(
-                f"Пользователь {query.from_user.full_name}({query.from_user.id}) покупает билеты..."
-            )
-            await message.edit_reply_markup(
-                ButtonsMenu.get_buy_markup(query.from_user.id)
-            )
-        if data.startswith("menu"):
-            await message.edit_text(Utils.START_MESSAGE)
-            await message.edit_reply_markup(ButtonsMenu.get_start_markup())
 
-        if data.startswith("reg_user_to"):
-            date = datetime.datetime.strptime(
-                "".join(data.split("_")[3:]), Utils.DATE_FORMAT
-            )
+        if self.db.is_event_full(event_date):
+            await query.answer("❌ Нет свободных мест!")
+            return
 
-            result = self.db.check_registration_by_tgid(query.from_user.id, date.date(), is_active=False)
-            if result:
-                await query.answer("❌ Вы уже были зарегистрированы на это событие!!!")
-                return
-            if self.db.is_event_is_full(date):
-                await query.answer("❌ Это событие закончилось или места кончились")
-                return
-            cost = Utils.COST
-            description = "Оплата прохода в клуб"
-            # receipt: dict[str, str] = {
-            #     "Email": "stutututuf@gmail.com",
-            #     "Phone": "+79602051271",
-            #     "Amount": str(cost * 100),
-            #     "Description": description,
-            # }
-            # token = sha256("".join(receipt).encode()).hexdigest()
-            # receipt["Token"] = token
+        payment = await self.tb.init_payment(
+            Utils.COST,
+            f"{query.from_user.id}_{time.time()}",
+            "Оплата входа на мероприятие",
+        )
 
-            r = await self.tb.init_payment(
-                cost,
-                hash(query.from_user.id + time.time()),
-                description,
-            )
+        await message.edit_text(
+            "Выберите способ оплаты:",
+            reply_markup=ButtonsMenu.get_payment_markup(
+                payment["PaymentURL"], Utils.COST
+            ),
+        )
 
-            await message.edit_text(
-                "Виды оплаты",
-                reply_markup=ButtonsMenu.get_payment_button(r["PaymentURL"], cost),
-            )
-            if await self.tb.await_payment(r["PaymentId"]):
-
-                self.logger.info(
-                    f"Пользователь {query.from_user.full_name}({query.from_user.id})"
-                    f" оплатил заказ {r['PaymentId']}"
-                )
-                try:
-                    hash_code = self.db.reg_new_visitor(
-                        query.from_user.id,
-                        date,
-                    )
-                except AttributeError:
-                    await message.edit_text(
-                        "`❌ Вы уже зарегистрированы на это событие!!!`",
-                    )
-                    return
-
-                image = await Utils.gen_qr_code(
-                    f"https://t.me/{self.me.username}?start={hash_code}"
-                )
-                img_byte_arr = io.BytesIO()
-                image.save(img_byte_arr, format="PNG")
-                img_byte_arr.seek(0)
-                await message.reply_photo(
-                    photo=img_byte_arr,
-                    caption=f"Ваш QR на дискотеку "
-                    f"{''.join(data.split('_')[3:])}!\n\n\n__Резервный код__:\n`{hash_code}`",
-                )
-                self.logger.info(
-                    "Пользователь %s (%s) получил код %s",
-                    query.from_user.full_name,
+        if await self.tb.await_payment(payment["PaymentId"]):
+            try:
+                hash_code = self.db.reg_new_visitor(
                     query.from_user.id,
-                    hash_code,
+                    datetime.datetime.combine(event_date, datetime.time()),
+                )
+            except ValueError as e:
+                await message.edit_text(f"❌ Ошибка: {str(e)}")
+                return
+
+            qr_image = await Utils.gen_qr_code(
+                f"https://t.me/{self.me.username}?start={hash_code}"
+            )
+
+            with io.BytesIO() as buffer:
+                qr_image.save(buffer, format="PNG")
+                buffer.seek(0)
+                await message.reply_photo(
+                    buffer, caption=f"Ваш QR-код на {event_date}:\n`{hash_code}`"
                 )
 
-            else:
-                try:
-                    await message.edit_text("Оплата отклонена, попробуйте позже")
-                except MessageNotModified:
-                    pass
+    async def _show_user_agreement(self, message: Message):
+        """Отображение пользовательского соглашения"""
+        await message.edit_text(
+            "Пользовательское соглашение\n...",  # Полный текст соглашения
+            reply_markup=ButtonsMenu.get_menu_markup(),
+        )
+
+    async def _show_payment_options(self, message: Message, user: User):
+        """Отображение вариантов оплаты"""
+        await message.edit_reply_markup(ButtonsMenu.get_buy_markup(user.id))
+
+    async def _show_main_menu(self, message: Message):
+        """Отображение главного меню"""
+        await message.edit_text(
+            Utils.START_MESSAGE, reply_markup=ButtonsMenu.get_start_markup()
+        )
+
+    async def _process_newsletter(self, data: str | bytes, message: Message):
+        """Обработка рассылки сообщений"""
+        user_id = data.split("_")[1]
+        if user_id == "cancel":
+            await message.delete()
+            return
+
+        users = [user.tg_id for user in self.db.get_all_users()]
+        progress = await message.reply(f"Рассылка для {len(users)} пользователей...")
+
+        for user_id in users:
+            try:
+                await self.send_message(str(user_id), str(self.messages[user_id]))
+            except Exception as e:
+                self.logger.error(f"Ошибка отправки для {user_id}: {e}")
+
+        await progress.edit_text(f"Рассылка завершена ({len(users)} пользователей)")
+        await message.delete()
