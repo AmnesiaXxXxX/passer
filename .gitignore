@@ -12,6 +12,7 @@ dump*
 database.db
 *.env
 dumps/
+backups/
 # Distribution / packaging
 .Python
 build/

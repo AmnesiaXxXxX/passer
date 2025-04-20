@@ -1,7 +1,11 @@
 """Модуль базы данных с использованием SQLAlchemy"""
 
 import logging
+import sqlite3
+import threading
+import time
 from datetime import date, datetime
+from pathlib import Path
 from typing import List, Optional
 
 from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
@@ -40,10 +44,39 @@ class Database:
     """Класс базы данных с использованием SQLAlchemy ORM"""
 
     def __init__(self, name: str = "database"):
-        self.engine = create_engine(f"sqlite:///{name}.db")
+        self.db_name = name + ".db"
+        self.engine = create_engine(f"sqlite:///{self.db_name}")
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger("database")
+        self.backup_dir = "backups"
+        self.dump_interval = 1 * 60 * 60
+        Path(self.backup_dir).mkdir(exist_ok=True)
+        self._start_backup_scheduler()
+
+    def _backup_scheduler(self):
+        """Планировщик создания резервных копий"""
+        while True:
+            time.sleep(self.dump_interval)
+            self._create_backup()
+
+    def _create_backup(self):
+        """Создает резервную копию базы данных"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"{self.backup_dir}/{self.db_name}_{timestamp}.bak"
+        try:
+            # Для SQLite просто копируем файл
+            with sqlite3.connect(self.db_name) as src:
+                with sqlite3.connect(backup_name) as dst:
+                    src.backup(dst)
+            self.logger.info(f"Создан бэкап: {backup_name}")
+        except Exception as e:
+            self.logger.info(f"Ошибка при создании бэкапа: {e}")
+
+    def _start_backup_scheduler(self):
+        """Запускает поток для периодического создания бэкапов"""
+        thread = threading.Thread(target=self._backup_scheduler, daemon=True)
+        thread.start()
 
     def get_session(self) -> Session:
         """Возвращает новую сессию базы данных"""
