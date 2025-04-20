@@ -4,8 +4,7 @@ import logging
 from datetime import date, datetime
 from typing import List, Optional
 
-from sqlalchemy import (Boolean, Column, Date, Integer, String, create_engine,
-                        func, or_)
+from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -45,34 +44,6 @@ class Database:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger("database")
-        self.create_tables()
-        asyncio.create_task(self.scheduled_dumps())
-
-    async def scheduled_dumps(self):
-        """Асинхронная задача для создания дампов каждый час"""
-        while True:
-            try:
-                await self.create_dump()
-                self.logger.info("Успешно создан дамп базы данных")
-            except Exception as e:
-                self.logger.error(f"Ошибка при создании дампа: {e}")
-
-            # Ждем 1 час перед следующим дампом
-            await asyncio.sleep(3600)
-
-    async def create_dump(self):
-        """Создает дамп базы данных в папке dumps"""
-        # Создаем папку dumps если ее нет
-        os.makedirs("dumps", exist_ok=True)
-
-        # Формируем имя файла с текущей датой и временем
-        timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
-        dump_filename = f"dumps/{timestamp}.sql"
-
-        # Создаем дамп
-        with open(dump_filename, "w", encoding="utf-8") as f:
-            for line in self.con.iterdump():
-                f.write(f"{line}\n")
 
     def get_session(self) -> Session:
         """Возвращает новую сессию базы данных"""
@@ -283,7 +254,9 @@ class Database:
         """Добавляет или обновляет событие"""
         with self.get_session() as session:
             registration = (
-                session.query(Registration).filter(Registration.date == to_datetime).first()
+                session.query(Registration)
+                .filter(Registration.date == to_datetime)
+                .first()
             )
 
             if registration:
@@ -302,7 +275,9 @@ class Database:
         with self.get_session() as session:
             session.query(Visitor).filter(Visitor.to_datetime == to_datetime).delete()
 
-            session.query(Registration).filter(Registration.date == to_datetime).delete()
+            session.query(Registration).filter(
+                Registration.date == to_datetime
+            ).delete()
 
             try:
                 session.commit()
