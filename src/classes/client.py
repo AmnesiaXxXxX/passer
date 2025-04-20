@@ -45,6 +45,8 @@ class CustomClient(Client):
             api_id,
             api_hash,
             bot_token=bot_token,
+            workers = int(os.getenv("WORKERS", 10)),
+            max_concurrent_transmissions=int(os.getenv("MAX_CONCURRENT_TRANSMISSONS", 10))
         )
 
         self._setup_handlers()
@@ -146,7 +148,7 @@ class CustomClient(Client):
         users = [
             event
             for event in self.db.get_all_visitors(message.from_user.id)
-            if bool(event.to_datetime >= datetime.datetime.now().date())
+            if booll(event.to_datetime >= datetime.datetime.now().date())
         ]
         for user in users:
 
