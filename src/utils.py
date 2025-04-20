@@ -1,6 +1,7 @@
 """Утилиты для бота"""
 
 import asyncio
+import hashlib
 import os
 from datetime import datetime
 from typing import Any, Callable, TypeVar, cast
@@ -10,7 +11,6 @@ import PIL.Image
 import qrcode
 from dotenv import load_dotenv
 from pyrogram.types import Message
-import hashlib
 
 load_dotenv()
 T = TypeVar("T")
@@ -34,6 +34,8 @@ class Utils:
     TRUE_CODE = "`✅ Код верный!`"
     FALSE_CODE = "`❌ Код неверный!`"
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
+    CALLBACK_USER_ALREADY_REGISTRATE = "❌ Вы уже были зарегистрированы!"
+    CALLBACK_USER_NOT_AVAILABLE = "❌ Места на это событие кончились!"
     COST = 250
 
     @staticmethod

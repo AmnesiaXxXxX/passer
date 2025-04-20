@@ -1,260 +1,284 @@
-"""Модуль базы данных"""
+"""Модуль базы данных с использованием SQLAlchemy"""
 
 import logging
-import sqlite3 as sql
-from datetime import UTC, date, datetime
-from typing import Any, List, Optional
+from datetime import date, datetime
+from typing import List, Optional
+
+from sqlalchemy import (Boolean, Column, Date, Integer, String, create_engine,
+                        func, or_)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.utils import Utils
 
+Base = declarative_base()
+
+
+class Visitor(Base):
+    __tablename__ = "visitors"
+    id = Column(Integer, primary_key=True)
+    tg_id = Column(String, nullable=False)
+    to_datetime = Column(Date, nullable=False)
+    hash_code = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    tg_id = Column(String, nullable=False, unique=True)
+
+
+class Registration(Base):
+    __tablename__ = "registrations"
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, nullable=False, unique=True)
+    max_visitors = Column(Integer, nullable=False)
+    visitors_count = Column(Integer, default=0)
+
 
 class Database:
-    """Класс базы данных"""
+    """Класс базы данных с использованием SQLAlchemy ORM"""
 
     def __init__(self, name: str = "database"):
-        self.con = sql.connect(name + ".db", check_same_thread=False, autocommit=True)
-        self.cur = self.con.cursor()
+        self.engine = create_engine(f"sqlite:///{name}.db")
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger("database")
-        self.create_tables()  # Добавлено: создание таблиц при старте
 
-    def create_tables(self):
-        """Создание таблиц"""
-        self.cur.execute(
-            """
-        CREATE TABLE IF NOT EXISTS visitors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tg_id TEXT NOT NULL,
-            to_datetime TEXT NOT NULL,
-            hash_code TEXT NOT NULL
-        )
-        """
-        )
-        self.cur.execute(
-            """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tg_id TEXT NOT NULL
-        )
-        """
-        )
-        self.cur.execute(
-            """
-        CREATE TABLE IF NOT EXISTS registrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tg_id TEXT,
-            event_date TEXT
-        )
-        """
-        )
-        self.logger.info("Создание таблиц успешно завершено.")
+    def get_session(self) -> Session:
+        """Возвращает новую сессию базы данных"""
+        return self.Session()
 
-    def get_all_visitors(self, q: Optional[str | int | datetime] = None) -> List[str]:
-        """Возвращает всех пользователей либо пользователей по фильтру"""
-
-        query = "SELECT * FROM visitors"
-        if q:
-            query += (
-                f"\nWHERE tg_id LIKE '%' || '{q}' || '%' OR"
-                f"\nto_datetime LIKE '%' || '{q}' || '%' OR"
-                f"\nhash_code LIKE '%' || '{q}' || '%'"
-            )
-        self.cur.execute(query)
-        return self.cur.fetchall()
-
-    def get_all_users(self, tg_id: Optional[str | int] = None):
-        query = "SELECT tg_id FROM users"
-        if tg_id:
-            query += " WHERE tg_id LIKE '%' || ? || '%'"
-            self.cur.execute(query, (tg_id,))
-            return self.cur.fetchall()
-        self.cur.execute(query)
-        return self.cur.fetchall()
-
-    def add_user(self, tg_id: str | int):
-        users = self.get_all_users(str(tg_id))
-        query = "INSERT INTO users(tg_id) VALUES(?)"
-        try:
-            if len(users) > 0:
-                return False
-            else:
-                self.cur.execute(query, (str(tg_id),))
-                self.logger.info(f"Добавление в бд users пользователя {tg_id}")
-                return True
-        except IndexError:
-            return False
-
-    def reg_new_visitor(
-        self,
-        tg_id: int | str,
-        to_datetime: datetime,
-        *,
-        entry_datetime: Optional[datetime] = None,
-    ):
-        """Функция регистрации пользователя"""
-        for event in self.get_all_visitors(tg_id):
-            # Try parsing with date first, then datetime if that fails
-            try:
-                event_datetime = datetime.strptime(event[1], "%Y-%m-%d")  # Date only
-            except ValueError:
-                try:
-                    event_datetime = datetime.strptime(event[1], "%Y-%m-%d %H:%M:%S")
-                except ValueError as e:
-                    raise ValueError(
-                        f"Could not parse datetime string: {event[1]}"
-                    ) from e
-
-            if event_datetime.date() == to_datetime.date():
-                raise AttributeError(
-                    "Такой пользователь уже зарегистрирован на это событие!"
+    def get_all_visitors(self, q: Optional[str] = None) -> List[Visitor]:
+        """Возвращает всех посетителей с возможностью фильтрации"""
+        with self.get_session() as session:
+            query = session.query(Visitor)
+            if q:
+                query = query.filter(
+                    or_(Visitor.tg_id.contains(q), Visitor.hash_code.contains(q))
                 )
+            return query.all()
 
-        if entry_datetime is None:
-            entry_datetime = datetime.now(UTC)
-        hash_code = Utils.generate_hash(tg_id, entry_datetime)
-        query = "INSERT INTO visitors (tg_id, to_datetime, hash_code, is_active) VALUES (?, ?, ?, 0)"
-        self.cur.execute(query, (str(tg_id), to_datetime.date(), hash_code))
-        return hash_code
+    def get_all_users(self) -> List[User]:
+        """Возвращает всех пользователей"""
+        with self.get_session() as session:
+            return session.query(User).all()
 
-    def delete_visitor(
-        self, tg_id: int | str, to_datetime: Optional[datetime | str] = None
-    ) -> None:
-        """
-        Удаляет пользователя из базы данных.
-        Если задан to_datetime, удаляет запись с указанными tg_id и to_datetime.
-        Иначе удаляются все записи с указанным tg_id.
-        """
-        if to_datetime is None:
-            query = "DELETE FROM visitors WHERE tg_id=?"
-            self.cur.execute(query, (str(tg_id),))
-        else:
-            query = "DELETE FROM visitors WHERE tg_id=? AND to_datetime=?"
-            self.cur.execute(query, (str(tg_id), to_datetime))
+    def add_user(self, tg_id: str) -> bool:
+        """Добавляет нового пользователя"""
+        with self.get_session() as session:
+            if session.query(User).filter(User.tg_id == tg_id).first():
+                return False
+            user = User(tg_id=tg_id)
+            session.add(user)
+            try:
+                session.commit()
+                self.logger.info(f"Добавлен пользователь {tg_id}")
+                return True
+            except Exception as e:
+                session.rollback()
+                self.logger.error(f"Ошибка добавления пользователя: {e}")
+                return False
 
-    def disable_visitor(self, hash_code: str):
-        """Деактивирует посетителя по хеш-коду (устанавливает is_active = 0)"""
-        try:
-            # Обновляем запись посетителя
-            self.cur.execute(
-                "UPDATE visitors SET is_active = 0 WHERE hash_code = ?", (hash_code,)
+    def reg_new_visitor(self, tg_id: str | int, to_datetime: datetime) -> str:
+        """Регистрирует нового посетителя"""
+        with self.get_session() as session:
+            event_date = to_datetime.date()
+
+            # Проверка существующей регистрации
+            if (
+                session.query(Visitor)
+                .filter(
+                    Visitor.tg_id == tg_id,
+                    Visitor.to_datetime == event_date,
+                    Visitor.is_active == True,
+                )
+                .first()
+            ):
+                raise AttributeError("Пользователь уже зарегистрирован")
+
+            # Генерация хэша
+            hash_code = Utils.generate_hash(tg_id, datetime.now())
+            visitor = Visitor(tg_id=tg_id, to_datetime=event_date, hash_code=hash_code)
+
+            # Обновление счетчика регистраций
+            registration = (
+                session.query(Registration)
+                .filter(Registration.date == event_date)
+                .first()
             )
-            return True
-        except (ValueError, IndexError) as e:
-            self.con.rollback()
-            self.logger.error(f"Ошибка при деактивации посетителя: {e}")
+
+            if not registration:
+                raise ValueError("Событие не существует")
+
+            if registration.visitors_count >= registration.max_visitors:
+                raise ValueError("Событие переполнено")
+
+            registration.visitors_count += 1
+            session.add_all([visitor, registration])
+            try:
+                session.commit()
+                return hash_code
+            except Exception as e:
+                session.rollback()
+                self.logger.error(f"Ошибка регистрации: {e}")
+                raise
+
+    def delete_visitor(self, tg_id: str, to_datetime: Optional[date] = None):
+        """Удаляет посетителя"""
+        with self.get_session() as session:
+            query = session.query(Visitor).filter(Visitor.tg_id == tg_id)
+            if to_datetime:
+                query = query.filter(Visitor.to_datetime == to_datetime)
+            visitors = query.all()
+
+            for visitor in visitors:
+                registration = (
+                    session.query(Registration)
+                    .filter(Registration.date == visitor.to_datetime)
+                    .first()
+                )
+                if registration:
+                    registration.visitors_count -= 1
+                    session.add(registration)
+
+            query.delete()
+            try:
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                self.logger.error(f"Ошибка удаления: {e}")
+                raise
+
+    def disable_visitor(self, hash_code: str) -> bool:
+        """Деактивирует посетителя"""
+        with self.get_session() as session:
+            visitor = (
+                session.query(Visitor).filter(Visitor.hash_code == hash_code).first()
+            )
+
+            if not visitor:
+                return False
+
+            visitor.is_active = False
+            registration = (
+                session.query(Registration)
+                .filter(Registration.date == visitor.to_datetime)
+                .first()
+            )
+
+            if registration:
+                registration.visitors_count = (
+                    session.query(func.count(Visitor.id))
+                    .filter(
+                        Visitor.to_datetime == visitor.to_datetime,
+                        Visitor.is_active == True,
+                    )
+                    .scalar()
+                )
+                session.add_all([visitor, registration])
+                try:
+                    session.commit()
+                    return True
+                except Exception as e:
+                    session.rollback()
+                    self.logger.error(f"Ошибка деактивации: {e}")
+                    return False
             return False
 
-    def enable_visitor(self, hash_code: str):
-        """Деактивирует посетителя по хеш-коду (устанавливает is_active = 0)"""
-        try:
-            # Обновляем запись посетителя
-            self.cur.execute(
-                "UPDATE visitors SET is_active = 1 WHERE hash_code = ?", (hash_code,)
+    def get_available_slots(self, to_datetime: date) -> int:
+        """Возвращает количество свободных мест"""
+        with self.get_session() as session:
+            registration = (
+                session.query(Registration)
+                .filter(Registration.date == to_datetime)
+                .first()
             )
-            self.con.commit()
-            return True
-        except (ValueError, IndexError) as e:
-            self.con.rollback()
-            self.logger.error(f"Ошибка при деактивации посетителя: {e}")
-            return False
+            return (
+                registration.max_visitors - registration.visitors_count
+                if registration
+                else 0
+            )
 
-    def get_available_slots(self, to_datetime: str) -> int:
-        """Возвращает количество оставшихся свободных мест для указанного события."""
-        query = """
-            SELECT (max_visitors - visitors_count) AS available_slots
-            FROM registrations
-            WHERE date = ?
-        """
-        self.cur.execute(query, (to_datetime,))
-        result = self.cur.fetchone()
-        return result[0] if result else 0
-
-    def check_registration_by_hash(
-        self, hash_code: str, is_active: bool = False, is_strict: bool = True
-    ):
-        """Проверка записан ли пользователь на ивент по хешу"""
-        query = "SELECT * FROM visitors"
-        match is_strict:
-            case True:
-                query += " WHERE hash_code = ?"
-            case False:
-                query += f" WHERE hash_code LIKE '%' || ? || '%'"
-        if is_active:
-            query += " AND is_active == 1"
-        self.cur.execute(query, (hash_code,))
-        result = self.cur.fetchone()
-        if bool(result):
-            return result
-        return False
-
-    def remove(self, table: str, target: str, target_id: Any):
-        self.cur.execute("DELETE FROM ? WHERE ? == ?", (table, target, target_id))
+    def check_registration_by_hash(self, hash_code: str) -> Optional[Visitor]:
+        """Проверяет регистрацию по хэшу"""
+        with self.get_session() as session:
+            return session.query(Visitor).filter(Visitor.hash_code == hash_code).first()
 
     def check_registration_by_tgid(
-        self,
-        tg_id: int | str,
-        to_datetime: datetime | date,
-        is_active: bool | None = True,
-    ):
-        """Проверка записан ли пользователь на ивент по тг айди"""
-        query = "SELECT hash_code FROM visitors WHERE tg_id = ? AND to_datetime = ?"
-        if isinstance(is_active, bool):
-            query += f" AND is_active = {1 if is_active else 0}"
-        self.cur.execute(
-            query,
-            (
-                tg_id,
-                to_datetime,
-            ),
-        )
-        result = self.cur.fetchone()
-        if result:
-            return str(result[0])
-        return False
+        self, tg_id: str | int, to_datetime: date, is_active: bool = True
+    ) -> bool:
+        """Проверяет регистрацию по TG ID"""
+        with self.get_session() as session:
+            return (
+                session.query(Visitor)
+                .filter(
+                    Visitor.tg_id == tg_id,
+                    Visitor.to_datetime == to_datetime,
+                    Visitor.is_active == is_active,
+                )
+                .first()
+                is not None
+            )
 
-    def get_events(self, display_all: bool = False, show_old: bool = True):
-        """Функция получения всех ивентов"""
-        query = "SELECT * FROM registrations"
-        conditions: list[str] = []
+    def get_events(
+        self, show_all: bool = False, show_old: bool = True
+    ) -> List[Registration]:
+        """Возвращает список событий"""
+        with self.get_session() as session:
+            query = session.query(Registration)
 
-        if not display_all:
-            conditions.append("visitors_count < max_visitors")
-        if not show_old:
-            conditions.append("date(date, '+1 day') > date('now', 'localtime')")
+            if not show_all:
+                query = query.filter(
+                    Registration.visitors_count < Registration.max_visitors
+                )
+            if not show_old:
+                query = query.filter(Registration.date >= date.today())
+            return query.order_by(Registration.date).all()
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+    def is_event_full(self, to_datetime: date) -> bool:
+        """Проверяет заполнено ли событие"""
+        with self.get_session() as session:
+            registration = (
+                session.query(Registration)
+                .filter(Registration.date == to_datetime)
+                .first()
+            )
+            return (
+                registration.visitors_count >= registration.max_visitors
+                if registration
+                else True
+            )
 
-        query += " ORDER BY date ASC"  # Добавляем сортировку по дате
+    def add_event(self, to_datetime: date, max_visitors: int):
+        """Добавляет или обновляет событие"""
+        with self.get_session() as session:
+            registration = (
+                session.query(Registration).filter(Registration.date == to_datetime).first()
+            )
 
-        self.cur.execute(query)
-        return self.cur.fetchall()
+            if registration:
+                registration.max_visitors = max_visitors
+            else:
+                session.add(Registration(date=to_datetime, max_visitors=max_visitors))
+            try:
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                self.logger.error(f"Ошибка добавления события: {e}")
+                raise
 
-    def is_event_is_full(self, to_datetime: datetime):
-        """По дате события возвращает полно ли оно или нет"""
-        query = "SELECT * FROM registrations WHERE visitors_count < max_visitors AND date == ?"
-        self.cur.execute(query, (str(to_datetime.date()),))
-        result = self.cur.fetchone()
-        if result:
-            return False
-        return True
+    def delete_event(self, to_datetime: date):
+        """Удаляет событие"""
+        with self.get_session() as session:
+            session.query(Visitor).filter(Visitor.to_datetime == to_datetime).delete()
 
-    def add_event(self, to_datetime: datetime, max_visitors: int) -> None:
-        """Добавляет или обновляет событие в расписании."""
-        query = """
-            INSERT INTO registrations (date, max_visitors, visitors_count)
-            VALUES (?, ?, 0)
-            ON CONFLICT(date) DO UPDATE SET
-                max_visitors = excluded.max_visitors
-        """
-        self.cur.execute(query, (to_datetime.date().isoformat(), max_visitors))
-        self.con.commit()
+            session.query(Registration).filter(Registration.date == to_datetime).delete()
 
-    def delete_event(self, to_datetime: datetime) -> None:
-        """Полностью удаляет событие и связанные регистрации."""
-        date_str = to_datetime.date().isoformat()
-
-        # Удаляем связанных посетителей
-        self.cur.execute("DELETE FROM visitors WHERE to_datetime = ?", (date_str,))
-        # Удаляем само событие
-        self.cur.execute("DELETE FROM registrations WHERE date = ?", (date_str,))
-        self.con.commit()
+            try:
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                self.logger.error(f"Ошибка удаления: {e}")
+                raise
