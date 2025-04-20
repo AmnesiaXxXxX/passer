@@ -251,17 +251,17 @@ class Database:
                 else True
             )
 
-    def add_event(self, date: date, max_visitors: int):
+    def add_event(self, to_datetime: date, max_visitors: int):
         """Добавляет или обновляет событие"""
         with self.get_session() as session:
             registration = (
-                session.query(Registration).filter(Registration.date == date).first()
+                session.query(Registration).filter(Registration.date == to_datetime).first()
             )
 
             if registration:
                 registration.max_visitors = max_visitors
             else:
-                session.add(Registration(date=date, max_visitors=max_visitors))
+                session.add(Registration(date=to_datetime, max_visitors=max_visitors))
             try:
                 session.commit()
             except Exception as e:
@@ -269,12 +269,12 @@ class Database:
                 self.logger.error(f"Ошибка добавления события: {e}")
                 raise
 
-    def delete_event(self, date: date):
+    def delete_event(self, to_datetime: date):
         """Удаляет событие"""
         with self.get_session() as session:
-            session.query(Visitor).filter(Visitor.to_datetime == date).delete()
+            session.query(Visitor).filter(Visitor.to_datetime == to_datetime).delete()
 
-            session.query(Registration).filter(Registration.date == date).delete()
+            session.query(Registration).filter(Registration.date == to_datetime).delete()
 
             try:
                 session.commit()
