@@ -82,7 +82,7 @@ class Database:
         """Возвращает новую сессию базы данных"""
         return self.Session()
 
-    def get_all_visitors(self, q: Optional[str] = None) -> List[Visitor]:
+    def get_all_visitors(self, q: Optional[str | int] = None) -> List[Visitor]:
         """Возвращает всех посетителей с возможностью фильтрации"""
         with self.get_session() as session:
             query = session.query(Visitor)
@@ -97,7 +97,7 @@ class Database:
         with self.get_session() as session:
             return session.query(User).all()
 
-    def add_user(self, tg_id: str) -> bool:
+    def add_user(self, tg_id: str | int) -> bool:
         """Добавляет нового пользователя"""
         with self.get_session() as session:
             if session.query(User).filter(User.tg_id == tg_id).first():

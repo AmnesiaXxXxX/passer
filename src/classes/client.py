@@ -80,6 +80,8 @@ class CustomClient(Client):
             method = getattr(self, name)
             if inspect.iscoroutinefunction(method):
                 commands = name[7:].split("_")
+                if "admin" in commands:
+                    commands.remove("admin")
                 handler = self._wrap_handler(method, commands)
                 self.add_handler(MessageHandler(handler, filters.command(commands)))
 
@@ -140,6 +142,26 @@ class CustomClient(Client):
                 reply_markup=ButtonsMenu.get_newsletter_markup(message.from_user.id),
             )
 
+    async def handle_getmyqr(self, _, message: Message):
+        users = [
+            event
+            for event in self.db.get_all_visitors(message.from_user.id)
+            if bool(event.to_datetime >= datetime.datetime.now().date())
+        ]
+        for user in users:
+
+            qr_image = await Utils.gen_qr_code(
+                f"https://t.me/{self.me.username}?start={user.hash_code}"
+            )
+
+            with io.BytesIO() as buffer:
+                qr_image.save(buffer, format="PNG")
+                buffer.seek(0)
+                await message.reply_photo(
+                    buffer,
+                    caption=Utils.TRUE_PROMPT.format(user.to_datetime, user.hash_code),
+                )
+
     async def handle_main_start(self, _: Client, message: Message):
         """Обработка команд /main и /start"""
         self.db.add_user(message.from_user.id)
@@ -156,7 +178,7 @@ class CustomClient(Client):
             Utils.START_MESSAGE, reply_markup=ButtonsMenu.get_start_markup()
         )
 
-    async def handle_addevent_admin(self, message: Message):
+    async def handle_addevent_admin(self, _, message: Message):
         """Добавление нового события (админ)"""
         answer = await message.ask(f"Введите дату в формате {Utils.DATE_FORMAT}")
         event_date = datetime.datetime.strptime(answer.text, Utils.DATE_FORMAT).date()
@@ -207,7 +229,7 @@ class CustomClient(Client):
         ).date()
 
         if self.db.check_registration_by_tgid(query.from_user.id, event_date):
-            await query.answer("❌ Вы уже зарегистрированы!")
+            await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
             return
 
         if self.db.is_event_full(event_date):
@@ -245,7 +267,7 @@ class CustomClient(Client):
                 qr_image.save(buffer, format="PNG")
                 buffer.seek(0)
                 await message.reply_photo(
-                    buffer, caption=f"Ваш QR-код на {event_date}:\n`{hash_code}`"
+                    buffer, caption=Utils.TRUE_PROMPT.format(event_date, hash_code)
                 )
 
     async def _show_user_agreement(self, message: Message):

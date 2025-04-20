@@ -31,6 +31,7 @@ class Utils:
     DATE_FORMAT: str = "%Y-%m-%d"
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
     ADMIN_IDS: list[int | str] = get_env_admin_ids()
+    TRUE_PROMPT = "Ваш QR-код на {0}:\n`{1}`"
     TRUE_CODE = "`✅ Код верный!`"
     FALSE_CODE = "`❌ Код неверный!`"
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
