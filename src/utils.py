@@ -89,10 +89,10 @@ class Utils:
 
         def create_qr() -> PIL.Image.Image:
             qr = qrcode.QRCode(
-                version=2,
-                error_correction=qrcode.ERROR_CORRECT_H,
+                version=3,
+                error_correction=qrcode.ERROR_CORRECT_Q,
                 box_size=10,
-                border=3,
+                border=4,
             )
             if isinstance(data, list):
                 data_str = " ".join(data)
