@@ -11,7 +11,7 @@ import os
 from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
-
+import glob
 from src.utils import Utils
 
 Base = declarative_base()
@@ -73,8 +73,15 @@ class Database:
         except Exception as e:
             self.logger.info(f"Ошибка при создании бэкапа: {e}")
 
+    def _rotate_backups(self, max_backups=10):
+        backups = sorted(glob.glob(f"{self.backup_dir}/*.bak"))
+        if len(backups) > max_backups:
+            for old_backup in backups[:-max_backups]:
+                os.remove(old_backup)
+
     def _start_backup_scheduler(self):
         """Запускает поток для периодического создания бэкапов"""
+        self._rotate_backups()
         thread = threading.Thread(target=self._backup_scheduler, daemon=True)
         thread.start()
 
