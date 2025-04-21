@@ -50,7 +50,7 @@ class Database:
         self.Session = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger("database")
         self.backup_dir = "backups"
-        self.dump_interval = os.getenv("DUMP_INTERVAL", 3600)
+        self.dump_interval = int(os.getenv("DUMP_INTERVAL", 3600))
         Path(self.backup_dir).mkdir(exist_ok=True)
         self._start_backup_scheduler()
 
@@ -151,9 +151,10 @@ class Database:
 
             else:
                 raise ValueError("Не предоставлено нужных аргументов")
-        if visitor:
-            visitor.is_active = True
-            return str(visitor.hash_code)
+            if visitor:
+                visitor.is_active = True
+                session.commit()
+                return str(visitor.hash_code)
         raise sqlite3.Error("Ошибка создания пользователя")
 
     def reg_new_visitor(
@@ -169,7 +170,7 @@ class Database:
                 .filter(
                     Visitor.tg_id == tg_id,
                     Visitor.to_datetime == event_date,
-                    Visitor.is_active == is_active,
+                    Visitor.is_active == True,
                 )
                 .first()
             ):
@@ -177,7 +178,12 @@ class Database:
 
             # Генерация хэша
             hash_code = Utils.generate_hash(tg_id, datetime.now())
-            visitor = Visitor(tg_id=tg_id, to_datetime=event_date, hash_code=hash_code)
+            visitor = Visitor(
+                tg_id=tg_id,
+                to_datetime=event_date,
+                hash_code=hash_code,
+                is_active=is_active,
+            )
 
             # Обновление счетчика регистраций
             registration = (
@@ -202,7 +208,7 @@ class Database:
                 self.logger.error(f"Ошибка регистрации: {e}")
                 raise
 
-    def delete_visitor(self, tg_id: str, to_datetime: Optional[date] = None):
+    def delete_visitor(self, tg_id: str | int, to_datetime: Optional[date] = None):
         """Удаляет посетителя"""
         with self.get_session() as session:
             query = session.query(Visitor).filter(Visitor.tg_id == tg_id)

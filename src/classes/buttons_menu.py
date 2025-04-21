@@ -88,7 +88,7 @@ class ButtonsMenu:
                     InlineKeyboardButton(
                         "📝 Пользовательское соглашение", callback_data="useragreement"
                     )
-                ],
+                ],  
             ]
         )
 

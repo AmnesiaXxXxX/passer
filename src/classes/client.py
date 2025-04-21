@@ -250,20 +250,20 @@ class CustomClient(Client):
 
     async def _process_registration(self, query: CallbackQuery, message: Message):
         """Обработка регистрации на событие"""
-        event_date = datetime.datetime.strptime(
+        to_datetime = datetime.datetime.strptime(
             str(query.data).split("_")[-1], Utils.DATE_FORMAT
         ).date()
 
-        if self.db.check_registration_by_tgid(query.from_user.id, event_date):
+        if self.db.check_registration_by_tgid(query.from_user.id, to_datetime):
             await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
             return
 
-        if self.db.is_event_full(event_date):
+        if self.db.is_event_full(to_datetime):
             await query.answer("❌ Нет свободных мест!")
             return
         hash_code = self.db.reg_new_visitor(
             query.from_user.id,
-            datetime.datetime.combine(event_date, datetime.time()),
+            datetime.datetime.combine(to_datetime, datetime.time()),
             False,
         )
         payment = await self.tb.init_payment(
@@ -291,8 +291,10 @@ class CustomClient(Client):
                 qr_image.save(buffer, format="PNG")
                 buffer.seek(0)
                 await message.reply_photo(
-                    buffer, caption=Utils.TRUE_PROMPT.format(event_date, hash_code)
+                    buffer, caption=Utils.TRUE_PROMPT.format(to_datetime, hash_code)
                 )
+            return
+        self.db.delete_visitor(query.from_user.id, to_datetime)
 
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
