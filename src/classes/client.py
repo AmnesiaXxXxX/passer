@@ -45,8 +45,10 @@ class CustomClient(Client):
             api_id,
             api_hash,
             bot_token=bot_token,
-            workers = int(os.getenv("WORKERS", 10)),
-            max_concurrent_transmissions=int(os.getenv("MAX_CONCURRENT_TRANSMISSONS", 10))
+            workers=int(os.getenv("WORKERS", 10)),
+            max_concurrent_transmissions=int(
+                os.getenv("MAX_CONCURRENT_TRANSMISSONS", 10)
+            ),
         )
 
         self._setup_handlers()
@@ -167,14 +169,36 @@ class CustomClient(Client):
     async def handle_main_start(self, _: Client, message: Message):
         """Обработка команд /main и /start"""
         self.db.add_user(message.from_user.id)
-        if len(message.command) > 1 and message.from_user.id in Utils.ADMIN_IDS:
-            code = message.command[1]
-            if self.db.check_registration_by_hash(code):
-                self.db.disable_visitor(code)
-                await message.reply(Utils.TRUE_CODE)
+        if len(message.command) > 1:
+            hash_code = message.command[1]
+            if hash_code.startswith("activate"):
+                await message.delete()
+                return
+                # visitor = self.db.check_registration_by_hash(hash_code, False)
+                # if visitor:
+                #     self.db.enable_visitor(hash_code=hash_code)
+                #     qr_image = await Utils.gen_qr_code(
+                #         f"https://t.me/{self.me.username}?start={hash_code}"
+                #     )
+
+                #     with io.BytesIO() as buffer:
+                #         qr_image.save(buffer, format="PNG")
+                #         buffer.seek(0)
+                #         await message.reply_photo(
+                #             buffer,
+                #             caption=Utils.TRUE_PROMPT.format(
+                #                 visitor.to_datetime, hash_code
+                #             ),
+                #         )
+                #     return
             else:
-                await message.reply(Utils.FALSE_CODE)
-            return
+                if message.from_user.id in Utils.ADMIN_IDS:
+                    if self.db.check_registration_by_hash(hash_code):
+                        self.db.disable_visitor(hash_code)
+                        await message.reply(Utils.TRUE_CODE)
+                    else:
+                        await message.reply(Utils.FALSE_CODE)
+                    return
 
         await message.reply(
             Utils.START_MESSAGE, reply_markup=ButtonsMenu.get_start_markup()
@@ -237,11 +261,16 @@ class CustomClient(Client):
         if self.db.is_event_full(event_date):
             await query.answer("❌ Нет свободных мест!")
             return
-
+        hash_code = self.db.reg_new_visitor(
+            query.from_user.id,
+            datetime.datetime.combine(event_date, datetime.time()),
+            False,
+        )
         payment = await self.tb.init_payment(
             Utils.COST,
             f"{query.from_user.id}_{time.time()}",
             "Оплата входа на мероприятие",
+            success_url=Utils.SUCCESS_URL(self.me.username, hash_code[:5]),
         )
 
         await message.edit_text(
@@ -252,14 +281,7 @@ class CustomClient(Client):
         )
 
         if await self.tb.await_payment(payment["PaymentId"]):
-            try:
-                hash_code = self.db.reg_new_visitor(
-                    query.from_user.id,
-                    datetime.datetime.combine(event_date, datetime.time()),
-                )
-            except ValueError as e:
-                await message.edit_text(f"❌ Ошибка: {str(e)}")
-                return
+            self.db.enable_visitor(hash_code=hash_code)
 
             qr_image = await Utils.gen_qr_code(
                 f"https://t.me/{self.me.username}?start={hash_code}"

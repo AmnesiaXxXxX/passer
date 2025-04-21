@@ -32,6 +32,7 @@ class Utils:
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
     ADMIN_IDS: list[int | str] = get_env_admin_ids()
     TRUE_PROMPT = "Ваш QR-код на {0}:\n`{1}`"
+    SUCCESS_URL = "https://t.me/{0}?start=activate{1}".format
     TRUE_CODE = "`✅ Код верный!`"
     FALSE_CODE = "`❌ Код неверный!`"
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
@@ -75,6 +76,7 @@ class Utils:
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
+
     @staticmethod
     def create_qr(data: str | list[str]) -> PIL.Image.Image:
         qr = qrcode.QRCode(

@@ -6,8 +6,8 @@ import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
-from typing import List, Optional
-
+from typing import List, Optional, overload
+import os
 from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
@@ -50,7 +50,7 @@ class Database:
         self.Session = sessionmaker(bind=self.engine)
         self.logger = logging.getLogger("database")
         self.backup_dir = "backups"
-        self.dump_interval = 1 * 60 * 60
+        self.dump_interval = os.getenv("DUMP_INTERVAL", 3600)
         Path(self.backup_dir).mkdir(exist_ok=True)
         self._start_backup_scheduler()
 
@@ -113,7 +113,52 @@ class Database:
                 self.logger.error(f"Ошибка добавления пользователя: {e}")
                 return False
 
-    def reg_new_visitor(self, tg_id: str | int, to_datetime: datetime) -> str:
+    @overload
+    def enable_visitor(
+        self,
+        *,
+        tg_id: Optional[int | str] = None,
+        to_datetime: Optional[datetime | date] = None,
+    ) -> str: ...
+    @overload
+    def enable_visitor(
+        self,
+        *,
+        hash_code: str | None = None,
+    ) -> str: ...
+
+    def enable_visitor(
+        self,
+        *,
+        tg_id: Optional[int | str] = None,
+        to_datetime: Optional[datetime | date] = None,
+        hash_code: Optional[str] = None,
+    ) -> str:
+        visitor: Optional[Visitor] = None
+        with self.get_session() as session:
+            if hash_code:
+                visitor = (
+                    session.query(Visitor)
+                    .filter(Visitor.hash_code == hash_code)
+                    .first()
+                )
+            elif tg_id and to_datetime:
+                visitor = (
+                    session.query(Visitor)
+                    .filter(Visitor.tg_id == tg_id, Visitor.to_datetime == to_datetime)
+                    .first()
+                )
+
+            else:
+                raise ValueError("Не предоставлено нужных аргументов")
+        if visitor:
+            visitor.is_active = True
+            return str(visitor.hash_code)
+        raise sqlite3.Error("Ошибка создания пользователя")
+
+    def reg_new_visitor(
+        self, tg_id: str | int, to_datetime: datetime, is_active: bool = True
+    ) -> str:
         """Регистрирует нового посетителя"""
         with self.get_session() as session:
             event_date = to_datetime.date()
@@ -124,7 +169,7 @@ class Database:
                 .filter(
                     Visitor.tg_id == tg_id,
                     Visitor.to_datetime == event_date,
-                    Visitor.is_active == True,
+                    Visitor.is_active == is_active,
                 )
                 .first()
             ):
@@ -233,10 +278,17 @@ class Database:
                 else 0
             )
 
-    def check_registration_by_hash(self, hash_code: str) -> Optional[Visitor]:
+    def check_registration_by_hash(
+        self, hash_code: str, is_strict: bool = True
+    ) -> Optional[Visitor]:
         """Проверяет регистрацию по хэшу"""
         with self.get_session() as session:
-            return session.query(Visitor).filter(Visitor.hash_code == hash_code).first()
+            query = session.query(Visitor)
+            if is_strict:
+                result = query.filter(Visitor.hash_code == hash_code)
+            else:
+                result = query.filter(Visitor.hash_code.like(hash_code))
+            return result.first()
 
     def check_registration_by_tgid(
         self, tg_id: str | int, to_datetime: date, is_active: bool = True
