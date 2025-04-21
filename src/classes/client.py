@@ -150,7 +150,7 @@ class CustomClient(Client):
         users = [
             event
             for event in self.db.get_all_visitors(message.from_user.id)
-            if booll(event.to_datetime >= datetime.datetime.now().date())
+            if bool(event.to_datetime >= datetime.datetime.now().date())
         ]
         for user in users:
 
@@ -297,7 +297,7 @@ class CustomClient(Client):
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
         await message.edit_text(
-            "Пользовательское соглашение\n...",  # Полный текст соглашения
+            open("USER_AGREEMENT.txt").read(),  # Полный текст соглашения
             reply_markup=ButtonsMenu.get_menu_markup(),
         )
 
