@@ -1,10 +1,9 @@
 """Модуль кнопок меню с использованием SQLAlchemy"""
 
 from datetime import datetime
-from typing import Union
+from typing import Union, List
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy.orm import Session
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineKeyboardButtonBuy
 
 from src.classes.database import Database
 from src.utils import Utils
@@ -25,7 +24,7 @@ class ButtonsMenu:
     @classmethod
     def get_buy_markup(cls, tg_id: Union[int, str]) -> InlineKeyboardMarkup:
         """Генерирует клавиатуру для покупки билетов"""
-        with Database().get_session() as session:
+        with Database().get_session():
             db = Database()
             buttons: List[InlineKeyboardButton] = []
 
