@@ -1,9 +1,9 @@
 """Модуль кнопок меню с использованием SQLAlchemy"""
 
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union, List
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineKeyboardButtonBuy
 from sqlalchemy.orm import Session
 
 from src.classes.database import Database
@@ -25,15 +25,16 @@ class ButtonsMenu:
     @classmethod
     def get_buy_markup(cls, tg_id: Union[int, str]) -> InlineKeyboardMarkup:
         """Генерирует клавиатуру для покупки билетов"""
-        with Database().get_session():
+        with Database().get_session() as session:
             db = Database()
-            buttons = []
+            buttons: List[InlineKeyboardButton] = []
 
             # Получаем доступные события
             events = db.get_events(show_all=True, show_old=False)
 
             for event in events:
-                available = int(event.max_visitors - event.visitors_count)
+                # Ensure we're working with actual integer values
+                available = int(event.max_visitors) - int(event.visitors_count)
                 date_obj = datetime.strptime(str(event.date), Utils.DATE_FORMAT)
 
                 # Проверяем регистрацию пользователя
@@ -62,7 +63,9 @@ class ButtonsMenu:
             buttons.append(cls._get_menu_button())
 
             # Группируем кнопки по 1 в ряд
-            keyboard = [[button] for button in buttons]
+            keyboard: List[List[InlineKeyboardButton | InlineKeyboardButtonBuy]] = [
+                [button] for button in buttons
+            ]
 
             return InlineKeyboardMarkup(keyboard)
 
@@ -88,7 +91,7 @@ class ButtonsMenu:
                     InlineKeyboardButton(
                         "📝 Пользовательское соглашение", callback_data="useragreement"
                     )
-                ],  
+                ],
             ]
         )
 
