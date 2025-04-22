@@ -25,7 +25,7 @@ class Visitor(Base):
     tg_id = Column(String, nullable=False)
     to_datetime = Column(Date, nullable=False)
     hash_code = Column(String, nullable=False, unique=True)
-    is_active = Column(Boolean, default=True)
+    is_active: bool | Column[bool] = Column(Boolean, default=True)
 
 
 class User(Base):
@@ -38,8 +38,8 @@ class Registration(Base):
     __tablename__ = "registrations"
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False, unique=True)
-    max_visitors = Column(Integer, nullable=False)
-    visitors_count = Column(Integer, default=0)
+    max_visitors: int | Column[int] = Column(Integer, nullable=False)
+    visitors_count: int | Column[int] = Column(Integer, default=0)
 
 
 class Database:
@@ -178,7 +178,7 @@ class Database:
                 .filter(
                     Visitor.tg_id == tg_id,
                     Visitor.to_datetime == event_date,
-                    Visitor.is_active,
+                    Visitor.is_active is is_active,
                 )
                 .first()
             ):
@@ -203,7 +203,7 @@ class Database:
             if not registration:
                 raise ValueError("Событие не существует")
 
-            if registration.visitors_count >= registration.max_visitors:
+            if bool(registration.visitors_count >= registration.max_visitors):
                 raise ValueError("Событие переполнено")
 
             session.add_all([visitor, registration])
@@ -321,10 +321,16 @@ class Database:
 
     def get_available(self, date: str | date | Column[date]) -> int:
         with self.get_session() as session:
-            query = session.query(Registration)
-            max_visitors = query.filter(Registration.date == date).first().max_visitors
+            query = (
+                session.query(Registration).filter(Registration.date == date).first()
+            )
+            if query:
+                max_visitors = int(query.max_visitors.__str__())
+            else:
+                max_visitors = 230
             query = session.query(Visitor)
             visitors = len(query.filter(Visitor.to_datetime == date).all())
+
             return int(max_visitors - visitors)
 
     def get_events(
@@ -350,11 +356,10 @@ class Database:
                 .filter(Registration.date == to_datetime)
                 .first()
             )
-            return (
-                registration.visitors_count >= registration.max_visitors
-                if registration
-                else True
-            )
+            if registration:
+                return bool(registration.visitors_count >= registration.max_visitors)
+            else:
+                return True
 
     def add_event(self, to_datetime: date, max_visitors: int):
         """Добавляет или обновляет событие"""
