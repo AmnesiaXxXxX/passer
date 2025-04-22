@@ -103,12 +103,12 @@ class CustomClient(Client):
                 commands = name[7:].split("_")
                 if "admin" in commands:
                     commands.remove("admin")
-                handler = self._wrap_handler(self._enqueue_message, commands)
+                handler = self._wrap_handler(method, commands)
                 self.add_handler(MessageHandler(handler, filters.command(commands)))
 
     def _setup_callbacks(self):
         """Регистрация обработчиков колбэков"""
-        wrapped_callback = self._error_handler_wrapper(self._enqueue_callback)
+        wrapped_callback = self._error_handler_wrapper(self._process_callback)
         self.add_handler(CallbackQueryHandler(wrapped_callback))
 
     def _wrap_handler(self, handler: Callable, commands: list) -> Callable:
@@ -143,10 +143,6 @@ class CustomClient(Client):
             except Exception as e:
                 self.logger.error(f"Ошибка отправки сообщения: {e}")
 
-    async def _enqueue_message(self, client, message):
-        """Добавление сообщения в очередь"""
-        self.task_queue.put((self._process_message, (client, message)))
-
     async def _process_message(self, client, message):
         """Обработка сообщения из очереди"""
         command = message.command[0]
@@ -155,34 +151,12 @@ class CustomClient(Client):
         if hasattr(self, method_name):
             await getattr(self, method_name)(client, message)
 
-    async def _enqueue_callback(self, client, query):
-        """Добавление callback-запроса в очередь"""
-        self.task_queue.put((self._process_callback, (client, query)))
-
-    async def _process_callback(self, client, query):
-        """Обработка callback-запроса из очереди"""
-        data = str(query.data)
-        message = query.message
-
-        if data.startswith("useragreement"):
-            await self._show_user_agreement(message)
-        elif data.startswith("reg_error"):
-            await self._process_registration_errors(query, message)
-        elif data.startswith("reg_user_to"):
-            await self._process_registration(query, message)
-        elif data.startswith("buytickets"):
-            await self._show_payment_options(message, query.from_user)
-        elif data.startswith("menu"):
-            await self._show_main_menu(message)
-        elif data.startswith("send"):
-            await self._process_newsletter(data, message)
-
     async def handle_genqr_admin(self, _, message: Message):
-
+        """Функция для генерации QR кода"""
         qr_image = await Utils.gen_qr_code(
-            f"https://t.me/{self.me.username}?start={message.command[1]}"
+            Utils.QR_URL(self.me.username if self.me else "", message.command[1])
         )
-        
+
         with io.BytesIO() as buffer:
             qr_image.save(buffer, format="PNG")
             buffer.seek(0)
@@ -197,9 +171,10 @@ class CustomClient(Client):
         """Проверка регистрации по хэш-коду (админ)"""
         if hash_code := message.command[1]:
             visitor = self.db.check_registration_by_hash(hash_code)
-            if visitor and visitor.is_active:
-                await message.reply(Utils.TRUE_CODE)
-                self.db.disable_visitor(hash_code)
+            if visitor:
+                if bool(visitor.is_active):
+                    await message.reply(Utils.TRUE_CODE)
+                    self.db.disable_visitor(hash_code)
             else:
                 await message.reply(Utils.FALSE_CODE)
 
@@ -214,6 +189,7 @@ class CustomClient(Client):
             )
 
     async def handle_getmyqr(self, _, message: Message):
+        """Функция для генерации QR кода личного для пользователя"""
         args = message.command[1:]
         if len(args) > 0:
             if message.from_user.id in Utils.ADMIN_IDS:
@@ -230,7 +206,7 @@ class CustomClient(Client):
         for user in users:
 
             qr_image = await Utils.gen_qr_code(
-                f"https://t.me/{self.me.username}?start={user.hash_code}"
+                Utils.QR_URL(self.me.username if self.me else "", message.command[1])
             )
 
             with io.BytesIO() as buffer:
@@ -343,7 +319,9 @@ class CustomClient(Client):
             Utils.COST,
             f"{query.from_user.id}_{time.time()}",
             "Оплата входа на мероприятие",
-            success_url=Utils.SUCCESS_URL(self.me.username, hash_code[:5]),
+            success_url=Utils.SUCCESS_URL(
+                self.me.username if self.me else "", hash_code[:5]
+            ),
         )
 
         await message.edit_text(
@@ -357,7 +335,7 @@ class CustomClient(Client):
             self.db.enable_visitor(hash_code=hash_code)
 
             qr_image = await Utils.gen_qr_code(
-                f"https://t.me/{self.me.username}?start={hash_code}"
+                Utils.QR_URL(self.me.username if self.me else "", message.command[1])
             )
 
             with io.BytesIO() as buffer:
@@ -387,7 +365,7 @@ class CustomClient(Client):
             Utils.START_MESSAGE, reply_markup=ButtonsMenu.get_start_markup()
         )
 
-    async def _process_newsletter(self, data: str | bytes, message: Message):
+    async def _process_newsletter(self, data: str, message: Message):
         """Обработка рассылки сообщений"""
         user_id = data.split("_")[1]
         if user_id == "cancel":
@@ -399,7 +377,9 @@ class CustomClient(Client):
 
         for user_id in users:
             try:
-                await self.send_message(str(user_id), str(self.messages[user_id]))
+                await self.send_message(
+                    str(user_id), str(self.messages.__getitem__(str(user_id)))
+                )
             except Exception as e:
                 self.logger.error(f"Ошибка отправки для {user_id}: {e}")
 

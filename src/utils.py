@@ -38,6 +38,7 @@ class Utils:
     FALSE_CODE_ALREADY_USED = "`❌ Код уже был использован!`"
     CALLBACK_USER_ALREADY_REGISTRATE = "❌ Вы уже были зарегистрированы!"
     CALLBACK_USER_NOT_AVAILABLE = "❌ Места на это событие кончились!"
+    QR_URL = "https://t.me/{0}?start={1}".format
     COST = 250
 
     @staticmethod
