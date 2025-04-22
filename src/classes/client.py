@@ -147,9 +147,17 @@ class CustomClient(Client):
             )
 
     async def handle_getmyqr(self, _, message: Message):
+        args = message.command[1:]
+        if len(args) > 0:
+            if message.from_user.id in Utils.ADMIN_IDS:
+                user_id = args[0]
+            else:
+                user_id = message.from_user.id
+        else:
+            user_id = message.from_user.id
         users = [
             event
-            for event in self.db.get_all_visitors(message.from_user.id)
+            for event in self.db.get_all_visitors(user_id)
             if bool(event.to_datetime >= datetime.datetime.now().date())
         ]
         for user in users:

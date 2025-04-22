@@ -1,17 +1,19 @@
 """Модуль базы данных с использованием SQLAlchemy"""
 
+import glob
 import logging
+import os
 import sqlite3
 import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional, overload
-import os
+
 from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
-import glob
+
 from src.utils import Utils
 
 Base = declarative_base()
@@ -171,13 +173,12 @@ class Database:
         with self.get_session() as session:
             event_date = to_datetime.date()
 
-            # Проверка существующей регистрации
             if (
                 session.query(Visitor)
                 .filter(
                     Visitor.tg_id == tg_id,
                     Visitor.to_datetime == event_date,
-                    Visitor.is_active == True,
+                    Visitor.is_active,
                 )
                 .first()
             ):
@@ -205,7 +206,6 @@ class Database:
             if registration.visitors_count >= registration.max_visitors:
                 raise ValueError("Событие переполнено")
 
-            registration.visitors_count += 1
             session.add_all([visitor, registration])
             try:
                 session.commit()
@@ -263,7 +263,7 @@ class Database:
                     session.query(func.count(Visitor.id))
                     .filter(
                         Visitor.to_datetime == visitor.to_datetime,
-                        Visitor.is_active == True,
+                        Visitor.is_active is True,
                     )
                     .scalar()
                 )

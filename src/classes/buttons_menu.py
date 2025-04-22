@@ -1,10 +1,9 @@
 """Модуль кнопок меню с использованием SQLAlchemy"""
 
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy.orm import Session
 
 from src.classes.database import Database
 from src.utils import Utils
