@@ -277,20 +277,6 @@ class Database:
                     return False
             return False
 
-    def get_available_slots(self, to_datetime: date) -> int:
-        """Возвращает количество свободных мест"""
-        with self.get_session() as session:
-            registration = (
-                session.query(Registration)
-                .filter(Registration.date == to_datetime)
-                .first()
-            )
-            return (
-                registration.max_visitors - registration.visitors_count
-                if registration
-                else 0
-            )
-
     def check_registration_by_hash(
         self, hash_code: str, is_strict: bool = True
     ) -> Optional[Visitor]:

@@ -3,8 +3,7 @@
 import asyncio
 import time
 
-from tinkoff_acquiring.client import (TinkoffAcquiringAPIClient,
-                                      TinkoffAPIException)
+from tinkoff_acquiring.client import TinkoffAcquiringAPIClient, TinkoffAPIException
 
 
 class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
@@ -32,7 +31,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
                     if state == "CONFIRMED":
                         return True
                     if state == "FORM_SHOWED":
-                        timeout *= 2
+                        timeout += 1
             except TinkoffAPIException:
                 pass
             except asyncio.CancelledError:

@@ -131,7 +131,7 @@ class CustomClient(Client):
         qr_image = await Utils.gen_qr_code(
             f"https://t.me/{self.me.username}?start={message.command[1]}"
         )
-        
+
         with io.BytesIO() as buffer:
             qr_image.save(buffer, format="PNG")
             buffer.seek(0)
@@ -261,9 +261,7 @@ class CustomClient(Client):
         elif data.startswith("send"):
             await self._process_newsletter(data, message)
 
-    async def _process_registration_errors(
-        self, query: CallbackQuery, message: Message
-    ):
+    async def _process_registration_errors(self, query: CallbackQuery, _: Message):
         match query.data:
             case "reg_error_already_registrate":
                 await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
@@ -275,7 +273,7 @@ class CustomClient(Client):
     async def _process_registration(self, query: CallbackQuery, message: Message):
         """Обработка регистрации на событие"""
         to_datetime = datetime.datetime.strptime(
-            str(query.data).split("_")[-1], Utils.DATE_FORMAT
+            str(query.data).rsplit("_", maxsplit=1)[-1], Utils.DATE_FORMAT
         ).date()
 
         if self.db.check_registration_by_tgid(query.from_user.id, to_datetime):
