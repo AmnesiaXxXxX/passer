@@ -1,18 +1,43 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/*.pyo
+alembic/versions/*.pyd
+alembic/versions/__pycache__/
+
+# SQLite Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Byte-compiled / optimized / DLL files
 *$py.class
 
 # C extensions
 *.so
 dump*
-*.db
-*.sqlite
 .vscode/
 database.db
 *.env
 dumps/
 backups/
+
 # Distribution / packaging
 .Python
 build/
@@ -63,7 +88,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -136,10 +160,6 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
-env/
-venv/
-ENV/
 env.bak/
 venv.bak/
 
