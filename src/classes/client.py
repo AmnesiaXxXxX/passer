@@ -126,6 +126,22 @@ class CustomClient(Client):
             except Exception as e:
                 self.logger.error(f"Ошибка отправки сообщения: {e}")
 
+    async def handle_genqr_admin(self, _, message: Message):
+
+        qr_image = await Utils.gen_qr_code(
+            f"https://t.me/{self.me.username}?start={message.command[1]}"
+        )
+        
+        with io.BytesIO() as buffer:
+            qr_image.save(buffer, format="PNG")
+            buffer.seek(0)
+            await message.reply_photo(
+                buffer,
+                caption=Utils.TRUE_PROMPT.format(
+                    message.command[2], message.command[1]
+                ),
+            )
+
     async def handle_check_admin(self, message: Message):
         """Проверка регистрации по хэш-коду (админ)"""
         if hash_code := message.command[1]:
