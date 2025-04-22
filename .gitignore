@@ -17,8 +17,7 @@ alembic/versions/__pycache__/
 
 # SQLite Database
 *.db
-*.sqlite3
-
+*.sql*
 # Logs
 *.log
 
