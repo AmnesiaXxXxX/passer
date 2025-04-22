@@ -319,6 +319,14 @@ class Database:
                 is not None
             )
 
+    def get_available(self, date: str | date | Column[date]) -> int:
+        with self.get_session() as session:
+            query = session.query(Registration)
+            max_visitors = query.filter(Registration.date == date).first().max_visitors
+            query = session.query(Visitor)
+            visitors = len(query.filter(Visitor.to_datetime == date).all())
+            return int(max_visitors - visitors)
+
     def get_events(
         self, show_all: bool = False, show_old: bool = True
     ) -> List[Registration]:

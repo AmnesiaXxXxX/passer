@@ -3,7 +3,11 @@
 from datetime import datetime
 from typing import Union, List
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineKeyboardButtonBuy
+from pyrogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButtonBuy,
+)
 
 from src.classes.database import Database
 from src.utils import Utils
@@ -33,7 +37,7 @@ class ButtonsMenu:
 
             for event in events:
                 # Ensure we're working with actual integer values
-                available = int(event.max_visitors) - int(event.visitors_count)
+                available = db.get_available(event.date)
                 date_obj = datetime.strptime(str(event.date), Utils.DATE_FORMAT)
 
                 # Проверяем регистрацию пользователя
