@@ -1,10 +1,13 @@
 """Модуль кастомного клиента с использованием SQLAlchemy"""
 
+import asyncio
 import datetime
 import inspect
 import io
 import logging
 import os
+import queue
+import threading
 import time
 import traceback
 from typing import Callable, Optional, TypeVar
@@ -23,7 +26,7 @@ ClientVar = TypeVar("ClientVar")
 
 
 class CustomClient(Client):
-    """Кастомный клиент с интеграцией SQLAlchemy"""
+    """Кастомный клиент с интеграцией SQLAlchemy и очередями"""
 
     def __init__(
         self,
@@ -38,6 +41,7 @@ class CustomClient(Client):
             os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
         )
         self.messages: dict[str, str] = {}
+        self.task_queue = queue.Queue()
 
         self._validate_credentials(api_id, api_hash, name, bot_token)
         super().__init__(
@@ -53,7 +57,20 @@ class CustomClient(Client):
 
         self._setup_handlers()
         self._setup_callbacks()
+        threading.Thread(target=self._worker, daemon=True).start()
         self.logger.info("Инициализация клиента завершена")
+
+    def _worker(self):
+        """Воркер для последовательной обработки задач из очереди"""
+        while True:
+            func, arg = self.task_queue.get()
+            try:
+
+                asyncio.run(func(*arg))
+            except Exception as e:
+                self.logger.error(f"Ошибка обработки задачи: {e}")
+            finally:
+                self.task_queue.task_done()
 
     def _validate_credentials(self, *args):
         """Проверка учетных данных"""
@@ -86,12 +103,12 @@ class CustomClient(Client):
                 commands = name[7:].split("_")
                 if "admin" in commands:
                     commands.remove("admin")
-                handler = self._wrap_handler(method, commands)
+                handler = self._wrap_handler(self._enqueue_message, commands)
                 self.add_handler(MessageHandler(handler, filters.command(commands)))
 
     def _setup_callbacks(self):
         """Регистрация обработчиков колбэков"""
-        wrapped_callback = self._error_handler_wrapper(self._process_callback)
+        wrapped_callback = self._error_handler_wrapper(self._enqueue_callback)
         self.add_handler(CallbackQueryHandler(wrapped_callback))
 
     def _wrap_handler(self, handler: Callable, commands: list) -> Callable:
@@ -126,12 +143,46 @@ class CustomClient(Client):
             except Exception as e:
                 self.logger.error(f"Ошибка отправки сообщения: {e}")
 
+    async def _enqueue_message(self, client, message):
+        """Добавление сообщения в очередь"""
+        self.task_queue.put((self._process_message, (client, message)))
+
+    async def _process_message(self, client, message):
+        """Обработка сообщения из очереди"""
+        command = message.command[0]
+        method_name = f"handle_{command}"
+
+        if hasattr(self, method_name):
+            await getattr(self, method_name)(client, message)
+
+    async def _enqueue_callback(self, client, query):
+        """Добавление callback-запроса в очередь"""
+        self.task_queue.put((self._process_callback, (client, query)))
+
+    async def _process_callback(self, client, query):
+        """Обработка callback-запроса из очереди"""
+        data = str(query.data)
+        message = query.message
+
+        if data.startswith("useragreement"):
+            await self._show_user_agreement(message)
+        elif data.startswith("reg_error"):
+            await self._process_registration_errors(query, message)
+        elif data.startswith("reg_user_to"):
+            await self._process_registration(query, message)
+        elif data.startswith("buytickets"):
+            await self._show_payment_options(message, query.from_user)
+        elif data.startswith("menu"):
+            await self._show_main_menu(message)
+        elif data.startswith("send"):
+            await self._process_newsletter(data, message)
+
     async def handle_genqr_admin(self, _, message: Message):
 
         qr_image = await Utils.gen_qr_code(
             f"https://t.me/{self.me.username}?start={message.command[1]}"
         )
-        
+
         with io.BytesIO() as buffer:
             qr_image.save(buffer, format="PNG")
             buffer.seek(0)
@@ -243,27 +294,7 @@ class CustomClient(Client):
             f"Добавлено событие на {event_date} " f"(макс. участников: {max_visitors})"
         )
 
-    async def _process_callback(self, _: Client, query: CallbackQuery):
-        """Обработка callback-запросов"""
-        data = str(query.data)
-        message = query.message
-
-        if data.startswith("useragreement"):
-            await self._show_user_agreement(message)
-        elif data.startswith("reg_error"):
-            await self._process_registration_errors(query, message)
-        elif data.startswith("reg_user_to"):
-            await self._process_registration(query, message)
-        elif data.startswith("buytickets"):
-            await self._show_payment_options(message, query.from_user)
-        elif data.startswith("menu"):
-            await self._show_main_menu(message)
-        elif data.startswith("send"):
-            await self._process_newsletter(data, message)
-
-    async def _process_registration_errors(
-        self, query: CallbackQuery, message: Message
-    ):
+    async def _process_registration_errors(self, query: CallbackQuery, _: Message):
         match query.data:
             case "reg_error_already_registrate":
                 await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
@@ -275,7 +306,7 @@ class CustomClient(Client):
     async def _process_registration(self, query: CallbackQuery, message: Message):
         """Обработка регистрации на событие"""
         to_datetime = datetime.datetime.strptime(
-            str(query.data).split("_")[-1], Utils.DATE_FORMAT
+            str(query.data).rsplit("_", maxsplit=1)[-1], Utils.DATE_FORMAT
         ).date()
 
         if self.db.check_registration_by_tgid(query.from_user.id, to_datetime):
@@ -319,6 +350,7 @@ class CustomClient(Client):
                 )
             return
         self.db.delete_visitor(query.from_user.id, to_datetime)
+        message.continue_propagation()
 
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
