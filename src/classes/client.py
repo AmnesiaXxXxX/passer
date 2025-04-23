@@ -190,8 +190,9 @@ class CustomClient(Client):
 
     async def handle_getmyqr(self, _, message: Message):
         """Функция для генерации QR кода личного для пользователя"""
-        args = message.command[1:]
-        if len(args) > 0:
+        print(message.command)
+        if len(message.command[1:]) > 0:
+            args = message.command[1:]
             if message.from_user.id in Utils.ADMIN_IDS:
                 user_id = args[0]
             else:
@@ -204,7 +205,6 @@ class CustomClient(Client):
             if bool(event.to_datetime >= datetime.datetime.now().date())
         ]
         for user in users:
-
             qr_image = await Utils.gen_qr_code(
                 Utils.QR_URL(self.me.username if self.me else "", user.hash_code)
             )
@@ -351,7 +351,9 @@ class CustomClient(Client):
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
         await message.edit_text(
-            open("USER_AGREEMENT.txt", encoding="utf-8").read(),  # Полный текст соглашения
+            open(
+                "USER_AGREEMENT.txt", encoding="utf-8"
+            ).read(),  # Полный текст соглашения
             reply_markup=ButtonsMenu.get_menu_markup(),
         )
 
