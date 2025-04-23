@@ -206,7 +206,7 @@ class CustomClient(Client):
         for user in users:
 
             qr_image = await Utils.gen_qr_code(
-                Utils.QR_URL(self.me.username if self.me else "", message.command[1])
+                Utils.QR_URL(self.me.username if self.me else "", user.hash_code)
             )
 
             with io.BytesIO() as buffer:
@@ -335,7 +335,7 @@ class CustomClient(Client):
             self.db.enable_visitor(hash_code=hash_code)
 
             qr_image = await Utils.gen_qr_code(
-                Utils.QR_URL(self.me.username if self.me else "", message.command[1])
+                Utils.QR_URL(self.me.username if self.me else "", hash_code)
             )
 
             with io.BytesIO() as buffer:
@@ -346,12 +346,12 @@ class CustomClient(Client):
                 )
             return
         self.db.delete_visitor(query.from_user.id, to_datetime)
-        message.continue_propagation()
+        return
 
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
         await message.edit_text(
-            open("USER_AGREEMENT.txt").read(),  # Полный текст соглашения
+            open("USER_AGREEMENT.txt", encoding="utf-8").read(),  # Полный текст соглашения
             reply_markup=ButtonsMenu.get_menu_markup(),
         )
 
