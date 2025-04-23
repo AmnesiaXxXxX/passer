@@ -31,7 +31,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
                     if state == "CONFIRMED":
                         return True
                     if state == "FORM_SHOWED":
-                        timeout += 1
+                        timeout += 5
                     if state == "REJECTED":
                         return False
             except TinkoffAPIException:

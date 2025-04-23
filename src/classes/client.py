@@ -333,7 +333,7 @@ class CustomClient(Client):
 
         if await self.tb.await_payment(payment["PaymentId"]):
             self.db.enable_visitor(hash_code=hash_code)
-
+            msg = await message.reply("Подождите, идёт генерация вашего куаркода")
             qr_image = await Utils.gen_qr_code(
                 Utils.QR_URL(self.me.username if self.me else "", hash_code)
             )
@@ -344,6 +344,7 @@ class CustomClient(Client):
                 await message.reply_photo(
                     buffer, caption=Utils.TRUE_PROMPT.format(to_datetime, hash_code)
                 )
+            await msg.delete()
             return
 
     async def _show_user_agreement(self, message: Message):
