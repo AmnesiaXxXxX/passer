@@ -346,7 +346,7 @@ class CustomClient(Client):
                 )
             return
         self.db.delete_visitor(query.from_user.id, to_datetime)
-        return
+        message.continue_propagation()
 
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
