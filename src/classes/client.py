@@ -317,7 +317,7 @@ class CustomClient(Client):
         )
         payment = await self.tb.init_payment(
             Utils.COST,
-            f"{query.from_user.id}_{time.time()}",
+            f"{query.from_user.id}_{to_datetime}",
             "Оплата входа на мероприятие",
             success_url=Utils.SUCCESS_URL(
                 self.me.username if self.me else "", hash_code[:5]
