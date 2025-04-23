@@ -345,7 +345,6 @@ class CustomClient(Client):
                     buffer, caption=Utils.TRUE_PROMPT.format(to_datetime, hash_code)
                 )
             return
-        self.db.delete_visitor(query.from_user.id, to_datetime)
 
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
