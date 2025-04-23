@@ -4,13 +4,17 @@ import asyncio
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar, Union, cast
 
 import PIL
-import PIL.Image
+import PIL.ImageOps
 import qrcode
 from dotenv import load_dotenv
+from PIL import Image
 from pyrogram.types import Message
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.colormasks import ImageColorMask
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
 
 load_dotenv()
 T = TypeVar("T")
@@ -79,20 +83,41 @@ class Utils:
         return sync_wrapper
 
     @staticmethod
-    def create_qr(data: str | list[str]) -> PIL.Image.Image:
+    def create_qr(data: Union[str, list[str]]) -> Image.Image:
+        """Генерация QR-кода с использованием изображения в качестве цветовой маски.
+
+        Args:
+            data (str | list[str]): Данные для генерации QR-кода. Если передается список,
+                                    его элементы будут объединены в одну строку.
+
+        Returns:
+            PIL.Image.Image: Сгенерированное изображение QR-кода с цветовой маской.
+        """
+        # Создаем объект QR-кода
         qr = qrcode.QRCode(
             version=2,
             error_correction=qrcode.ERROR_CORRECT_H,
             box_size=10,
             border=3,
         )
+
+        # Обрабатываем входные данные
         if isinstance(data, list):
             data_str = " ".join(data)
         else:
             data_str = data
+
+        # Добавляем данные в QR-код
         qr.add_data(data_str)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Создаем изображение с кастомной цветовой маской
+        img = qr.make_image(
+            image_factory=StyledPilImage,
+            module_drawer=RoundedModuleDrawer(),
+            color_mask=ImageColorMask((89, 88, 86), color_mask_path="image.png"),
+        )
+
         return img.get_image()
 
     @classmethod
