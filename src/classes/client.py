@@ -10,7 +10,7 @@ import queue
 import threading
 import time
 import traceback
-from typing import Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Awaitable
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -20,7 +20,7 @@ from pyrogram.types import CallbackQuery, Message, User
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
-from src.utils import Utils
+from src.utils import T, Utils
 
 ClientVar = TypeVar("ClientVar")
 
@@ -41,7 +41,6 @@ class CustomClient(Client):
             os.getenv("TINKOFF_TERMINAL_KEY"), os.getenv("TINKOFF_SECRET_KEY")
         )
         self.messages: dict[str, str] = {}
-        self.task_queue = queue.Queue()
 
         self._validate_credentials(api_id, api_hash, name, bot_token)
         super().__init__(
@@ -57,22 +56,9 @@ class CustomClient(Client):
 
         self._setup_handlers()
         self._setup_callbacks()
-        threading.Thread(target=self._worker, daemon=True).start()
         self.logger.info("Инициализация клиента завершена")
 
-    def _worker(self):
-        """Воркер для последовательной обработки задач из очереди"""
-        while True:
-            func, arg = self.task_queue.get()
-            try:
-
-                asyncio.run(func(*arg))
-            except Exception as e:
-                self.logger.error(f"Ошибка обработки задачи: {e}")
-            finally:
-                self.task_queue.task_done()
-
-    def _validate_credentials(self, *args):
+    def _validate_credentials(self, *args: dict[int, Any]):
         """Проверка учетных данных"""
         required = {
             "API_ID": args[0],
@@ -111,18 +97,31 @@ class CustomClient(Client):
         wrapped_callback = self._error_handler_wrapper(self._process_callback)
         self.add_handler(CallbackQueryHandler(wrapped_callback))
 
-    def _wrap_handler(self, handler: Callable, commands: list) -> Callable:
+    def _wrap_handler(
+        self, handler: Callable[..., Awaitable[Message]], commands: list[str]
+    ) -> Callable[..., Awaitable[Message]]:
         """Обертка для обработчиков с проверкой прав"""
         if "admin" in commands:
-            handler = filters.user(Utils.ADMIN_IDS)
+            original_handler = handler
+
+            async def admin_handler(client: Client, message: Message) -> Message:
+                if message.from_user and message.from_user.id in Utils.ADMIN_IDS:
+                    return await original_handler(client, message)
+                else:
+                    await message.reply("Unauthorized")
+                    return message
+
+            handler = admin_handler
         return self._error_handler_wrapper(handler)
 
-    def _error_handler_wrapper(self, func: Callable) -> Callable:
+    def _error_handler_wrapper(
+        self, func: Callable[..., Awaitable[Message | CallbackQuery]]
+    ) -> Callable[..., Awaitable[Message]]:
         """Декоратор для обработки ошибок"""
 
-        async def wrapper(*args, **kwargs):
+        async def wrapper(client: Client, message: Message) -> Callable[..., Message]:
             try:
-                return await func(*args, **kwargs)
+                return await func(client, message)
             except Exception as e:
                 await self._report_error(e, func.__name__)
 
@@ -143,7 +142,7 @@ class CustomClient(Client):
             except Exception as e:
                 self.logger.error(f"Ошибка отправки сообщения: {e}")
 
-    async def _process_message(self, client, message):
+    async def _process_message(self, client: Client, message: Message):
         """Обработка сообщения из очереди"""
         command = message.command[0]
         method_name = f"handle_{command}"
@@ -270,7 +269,7 @@ class CustomClient(Client):
             f"Добавлено событие на {event_date} " f"(макс. участников: {max_visitors})"
         )
 
-    async def _process_callback(self, _: Client, query: CallbackQuery):
+    async def _process_callback(self, _: Client, query: CallbackQuery) -> None:
         """Обработка callback-запросов"""
         data = str(query.data)
         message = query.message
@@ -317,7 +316,7 @@ class CustomClient(Client):
         )
         payment = await self.tb.init_payment(
             Utils.COST,
-            f"{query.from_user.id}_{to_datetime}",
+            f"{query.from_user.id}_{to_datetime}_{time.time()}",
             "Оплата входа на мероприятие",
             success_url=Utils.SUCCESS_URL(
                 self.me.username if self.me else "", hash_code[:5]
