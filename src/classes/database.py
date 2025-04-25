@@ -315,7 +315,11 @@ class Database:
             else:
                 max_visitors = 230
             query = session.query(Visitor)
-            visitors = len(query.filter(Visitor.to_datetime == date).all())
+            visitors = len(
+                query.filter(
+                    Visitor.to_datetime == date, Visitor.is_active == True
+                ).all()
+            )
 
             return int(max_visitors - visitors)
 
