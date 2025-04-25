@@ -10,6 +10,7 @@ import time
 import traceback
 from typing import Any, Awaitable, Callable, Optional, TypeVar
 
+from dotenv import load_dotenv
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers import CallbackQueryHandler, MessageHandler
@@ -162,7 +163,7 @@ class CustomClient(Client):
 
         tracemalloc.start()
         message = await message.reply(f"Генерация {count} QR-кодов...")
-
+        load_dotenv(override=True)
         executor = ProcessPoolExecutor(max_workers=int(os.getenv("generation_workers", 1)))
 
         async def generate_qr(index: int):
