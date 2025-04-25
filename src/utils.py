@@ -140,14 +140,19 @@ class Utils:
 
     @classmethod
     async def gen_qr_code(cls, data: str | list[str], style: Optional[str] = None):
-        """Асинхронная генерация QR-кода.
+        """Асинхронная генерация QR-кода через мультипроцессорное исполнение.
 
         Args:
             data (str | list[str]): Данные для генерации QR-кода. Если передается список,
                                       его элементы будут объединены в одну строку.
+            style (Optional[str]): Стиль генерации QR-кода.
 
         Returns:
             PIL.Image.Image: Сгенерированное изображение QR-кода.
         """
+        from concurrent.futures import ProcessPoolExecutor
 
-        return await asyncio.to_thread(cls.create_qr, data, style)
+        loop = asyncio.get_running_loop()
+        workers = int(os.getenv("generation_workers", 20))
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            return await loop.run_in_executor(executor, cls.create_qr, data, style)
