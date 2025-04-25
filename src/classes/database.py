@@ -75,7 +75,7 @@ class Database:
         except Exception as e:
             self.logger.info(f"Ошибка при создании бэкапа: {e}")
 
-    def _rotate_backups(self, max_backups=10):
+    def _rotate_backups(self, max_backups: int = 10):
         backups = sorted(glob.glob(f"{self.backup_dir}/*.bak"))
         if len(backups) > max_backups:
             for old_backup in backups[:-max_backups]:
@@ -178,7 +178,7 @@ class Database:
                 .filter(
                     Visitor.tg_id == tg_id,
                     Visitor.to_datetime == event_date,
-                    Visitor.is_active is is_active,
+                    Visitor.is_active == is_active,
                 )
                 .first()
             ):
@@ -263,7 +263,7 @@ class Database:
                     session.query(func.count(Visitor.id))
                     .filter(
                         Visitor.to_datetime == visitor.to_datetime,
-                        Visitor.is_active is True,
+                        Visitor.is_active == True,
                     )
                     .scalar()
                 )

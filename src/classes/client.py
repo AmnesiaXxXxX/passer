@@ -1,13 +1,10 @@
 """Модуль кастомного клиента с использованием SQLAlchemy"""
 
-import asyncio
 import datetime
 import inspect
 import io
 import logging
 import os
-import queue
-import threading
 import time
 import traceback
 from typing import Any, Callable, Optional, TypeVar, Awaitable
@@ -20,7 +17,7 @@ from pyrogram.types import CallbackQuery, Message, User
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
-from src.utils import T, Utils
+from src.utils import Utils
 
 ClientVar = TypeVar("ClientVar")
 
@@ -58,7 +55,7 @@ class CustomClient(Client):
         self._setup_callbacks()
         self.logger.info("Инициализация клиента завершена")
 
-    def _validate_credentials(self, *args: dict[int, Any]):
+    def _validate_credentials(self, *args: Any):
         """Проверка учетных данных"""
         required = {
             "API_ID": args[0],
