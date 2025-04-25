@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Callable, TypeVar, Union, cast
+from typing import Any, Callable, Optional, TypeVar, Union, cast, overload
 
 import qrcode
 from dotenv import load_dotenv
@@ -12,7 +12,7 @@ from PIL import Image
 from pyrogram.types import Message
 from qrcode.image.styledpil import StyledPilImage
 from qrcode.image.styles.colormasks import ImageColorMask
-from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer, CircleModuleDrawer
 
 load_dotenv()
 T = TypeVar("T")
@@ -80,18 +80,28 @@ class Utils:
             return async_wrapper
         return sync_wrapper
 
+    @overload
     @staticmethod
-    def create_qr(data: Union[str, list[str]]) -> Image.Image:
+    def create_qr(data: Union[str, list[str]]) -> Image.Image: ...
+    @overload
+    @staticmethod
+    def create_qr(data: Union[str, list[str]], style: Optional[str]) -> Image.Image: ...
+
+    @staticmethod
+    def create_qr(
+        data: Union[str, list[str]], style: Optional[str] = None
+    ) -> Image.Image:
         """Генерация QR-кода с использованием изображения в качестве цветовой маски.
 
+        Если передан дополнительный параметр style, применяется альтернативное оформление.
+
         Args:
-            data (str | list[str]): Данные для генерации QR-кода. Если передается список,
-                                    его элементы будут объединены в одну строку.
+            data (str | list[str]): Данные для генерации QR-кода.
+            style (Optional[str]): Стиль генерации QR-кода.
 
         Returns:
-            PIL.Image.Image: Сгенерированное изображение QR-кода с цветовой маской.
+            PIL.Image.Image: Сгенерированное изображение QR-кода.
         """
-        # Создаем объект QR-кода с оптимизированными параметрами
         load_dotenv(override=True)
         qr = qrcode.QRCode(
             version=os.getenv("version", 3),
@@ -99,25 +109,37 @@ class Utils:
             box_size=int(os.getenv("box_size", 15)),
             border=int(os.getenv("border", 2)),
         )
-
-        # Обрабатываем входные данные
         data_str = " ".join(data) if isinstance(data, list) else data
-
-        # Добавляем данные в QR-код
         qr.add_data(data_str)
         qr.make(fit=True)
-
-        # Создаем изображение с кастомной цветовой маской
-        img = qr.make_image(
-            image_factory=StyledPilImage,
-            module_drawer=RoundedModuleDrawer(),
-            color_mask=ImageColorMask((89, 88, 86), color_mask_path="image.png"),
-        )
+        match style:
+            case "plain":
+                img = qr.make_image(fill_color="black", back_color="white")
+            case "reversed_plain":
+                img = qr.make_image(fill_color="white", back_color="black")
+            case "rounded":
+                img = qr.make_image(
+                    image_factory=StyledPilImage,
+                    module_drawer=RoundedModuleDrawer(),
+                )
+            case "circle":
+                img = qr.make_image(
+                    image_factory=StyledPilImage,
+                    module_drawer=CircleModuleDrawer(),
+                )
+            case _:
+                img = qr.make_image(
+                    image_factory=StyledPilImage,
+                    module_drawer=RoundedModuleDrawer(),
+                    color_mask=ImageColorMask(
+                        (89, 88, 86), color_mask_path="image.png"
+                    ),
+                )
 
         return img.get_image()
 
     @classmethod
-    async def gen_qr_code(cls, data: str | list[str]):
+    async def gen_qr_code(cls, data: str | list[str], style: Optional[str] = None):
         """Асинхронная генерация QR-кода.
 
         Args:
@@ -128,7 +150,4 @@ class Utils:
             PIL.Image.Image: Сгенерированное изображение QR-кода.
         """
 
-        return await asyncio.to_thread(cls.create_qr, data)
-
-
-#
+        return await asyncio.to_thread(cls.create_qr, data, style)

@@ -1,5 +1,6 @@
 """Модуль кастомного клиента с использованием SQLAlchemy"""
 
+import asyncio
 import datetime
 import inspect
 import io
@@ -7,17 +8,20 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Callable, Optional, TypeVar, Awaitable
+from typing import Any, Awaitable, Callable, Optional, TypeVar
 
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers import CallbackQueryHandler, MessageHandler
-from pyrogram.types import CallbackQuery,  User
-from src.classes.message.Message import CustomMessage as Message
+from pyrogram.types import CallbackQuery, User
+
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
+from src.classes.message.Message import CustomMessage as Message
 from src.utils import Utils
+import tracemalloc
+from concurrent.futures import ProcessPoolExecutor
 
 ClientVar = TypeVar("ClientVar")
 
@@ -147,10 +151,50 @@ class CustomClient(Client):
         if hasattr(self, method_name):
             await getattr(self, method_name)(client, message)
 
+    async def handle_genqrtest_admin(self, _, message: Message):
+        """Генерация n QR-кодов одновременно с измерением памяти"""
+        args = message.command[1:]
+        if not args or not args[0].isdigit():
+            await message.reply("Укажите количество QR-кодов для генерации.")
+            return
+        start_time = time.time()
+        count = int(args[0])
+
+        tracemalloc.start()
+        message = await message.reply(f"Генерация {count} QR-кодов...")
+
+        executor = ProcessPoolExecutor(max_workers=50)
+
+        async def generate_qr(index: int):
+            # Здесь напрямую вызываем функцию генерации QR-кода в отдельном процессе.
+            loop = asyncio.get_running_loop()
+            qr_image = await loop.run_in_executor(
+                executor, Utils.create_qr, str(hash(index)), None
+            )
+            if index % 50 == 0:
+                await message.edit_text(f"Сгенерировано {index} куаркодов")
+            return qr_image
+
+        tasks = [generate_qr(i) for i in range(count)]
+        qr_images = await asyncio.gather(*tasks)
+
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        await message.edit_text(
+            f"Генерация завершена. Сгенерировано {len(qr_images)} QR-кодов за {time.time() - start_time:.2f} секунд.\n"
+            f"Использование памяти: {current / 1024 / 1024:.2f} MB (пик: {peak / 1024 / 1024:.2f} MB)"
+        )
+        executor.shutdown()
+
     async def handle_genqr_admin(self, _, message: Message):
         """Функция для генерации QR кода"""
+        if len(message.command[1:]) > 2:
+            style = message.command[3]
+        else:
+            style = "plain"
         qr_image = await Utils.gen_qr_code(
-            Utils.QR_URL(self.me.username if self.me else "", message.command[1])
+            Utils.QR_URL(self.me.username if self.me else "", message.command[1]), style
         )
 
         with io.BytesIO() as buffer:
@@ -348,6 +392,7 @@ class CustomClient(Client):
             return
         else:
             pass
+
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
         await message.edit_text(
@@ -364,6 +409,7 @@ class CustomClient(Client):
             await message.edit_reply_markup(markup)
         else:
             pass
+
     async def _show_main_menu(self, message: Message):
         """Отображение главного меню"""
         await message.edit_text(
