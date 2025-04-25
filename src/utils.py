@@ -91,19 +91,17 @@ class Utils:
         Returns:
             PIL.Image.Image: Сгенерированное изображение QR-кода с цветовой маской.
         """
-        # Создаем объект QR-кода
+        # Создаем объект QR-кода с оптимизированными параметрами
+        load_dotenv(override=True)
         qr = qrcode.QRCode(
-            version=2,
-            error_correction=qrcode.ERROR_CORRECT_H,
-            box_size=10,
-            border=3,
+            version=os.getenv("version", 3),
+            error_correction=int(os.getenv("error_correction", 1)),
+            box_size=int(os.getenv("box_size", 15)),
+            border=int(os.getenv("border", 2)),
         )
 
         # Обрабатываем входные данные
-        if isinstance(data, list):
-            data_str = " ".join(data)
-        else:
-            data_str = data
+        data_str = " ".join(data) if isinstance(data, list) else data
 
         # Добавляем данные в QR-код
         qr.add_data(data_str)
