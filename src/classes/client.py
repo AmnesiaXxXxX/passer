@@ -12,8 +12,8 @@ from typing import Any, Callable, Optional, TypeVar, Awaitable
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers import CallbackQueryHandler, MessageHandler
-from pyrogram.types import CallbackQuery, Message, User
-
+from pyrogram.types import CallbackQuery,  User
+from src.classes.message.Message import CustomMessage as Message
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database

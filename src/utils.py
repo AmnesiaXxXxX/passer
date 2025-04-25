@@ -6,8 +6,6 @@ import os
 from datetime import datetime
 from typing import Any, Callable, TypeVar, Union, cast
 
-import PIL
-import PIL.ImageOps
 import qrcode
 from dotenv import load_dotenv
 from PIL import Image
