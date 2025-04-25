@@ -306,11 +306,15 @@ class CustomClient(Client):
         if self.db.is_event_full(to_datetime):
             await query.answer("❌ Нет свободных мест!")
             return
-        hash_code = self.db.reg_new_visitor(
-            query.from_user.id,
-            datetime.datetime.combine(to_datetime, datetime.time()),
-            False,
-        )
+        try:
+            hash_code = self.db.reg_new_visitor(
+                query.from_user.id,
+                datetime.datetime.combine(to_datetime, datetime.time()),
+                False,
+            )
+        except AttributeError:
+            await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
+            return
         payment = await self.tb.init_payment(
             Utils.COST,
             f"{query.from_user.id}_{to_datetime}_{time.time()}",
@@ -342,7 +346,8 @@ class CustomClient(Client):
                 )
             await msg.delete()
             return
-
+        else:
+            pass
     async def _show_user_agreement(self, message: Message):
         """Отображение пользовательского соглашения"""
         await message.edit_text(
@@ -354,8 +359,11 @@ class CustomClient(Client):
 
     async def _show_payment_options(self, message: Message, user: User):
         """Отображение вариантов оплаты"""
-        await message.edit_reply_markup(ButtonsMenu.get_buy_markup(user.id))
-
+        markup = ButtonsMenu.get_buy_markup(user.id)
+        if message.reply_markup != markup:
+            await message.edit_reply_markup(markup)
+        else:
+            pass
     async def _show_main_menu(self, message: Message):
         """Отображение главного меню"""
         await message.edit_text(

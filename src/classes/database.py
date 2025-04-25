@@ -60,6 +60,8 @@ class Database:
         """Планировщик создания резервных копий"""
         while True:
             time.sleep(self.dump_interval)
+            with self.get_session() as session:
+                session.query(Visitor).filter(Visitor.is_active == True).delete()
             self._create_backup()
 
     def _create_backup(self):
@@ -100,6 +102,17 @@ class Database:
                     or_(Visitor.tg_id.contains(q), Visitor.hash_code.contains(q))
                 )
             return query.all()
+
+    def get_user_hashcode(self, tg_id: str | int, to_datetime: date | datetime) -> str:
+        with self.get_session() as session:
+            query = session.query(Visitor).filter(
+                Visitor.tg_id == tg_id, Visitor.to_datetime == to_datetime
+            )
+            if query:
+                return query.first()
+            raise ValueError(
+                f"Пользователь {tg_id} не зарегистрирован на {to_datetime}"
+            )
 
     def get_all_users(self) -> List[User]:
         """Возвращает всех пользователей"""
