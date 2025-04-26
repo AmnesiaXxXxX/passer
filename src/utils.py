@@ -12,7 +12,10 @@ from PIL import Image
 from pyrogram.types import Message
 from qrcode.image.styledpil import StyledPilImage
 from qrcode.image.styles.colormasks import ImageColorMask
-from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer, CircleModuleDrawer
+from qrcode.image.styles.moduledrawers.pil import (
+    RoundedModuleDrawer,
+    CircleModuleDrawer,
+)
 
 load_dotenv()
 T = TypeVar("T")
@@ -20,6 +23,7 @@ T = TypeVar("T")
 
 def get_env_admin_ids() -> list[int | str]:
     """Получаем значение из переменной окружения или используем значение по умолчанию"""
+    load_dotenv(override=True)
     ids_str = os.getenv("ADMIN_IDS", "5957115070,831985431")
     return [
         int(x.strip()) if x.strip().isdigit() else x.strip() for x in ids_str.split(",")

@@ -1,6 +1,5 @@
 """Модуль кастомного клиента с использованием SQLAlchemy"""
 
-import asyncio
 import datetime
 import inspect
 import io
@@ -10,7 +9,6 @@ import time
 import traceback
 from typing import Any, Awaitable, Callable, Optional, TypeVar
 
-from dotenv import load_dotenv
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers import CallbackQueryHandler, MessageHandler
@@ -21,8 +19,6 @@ from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPI
 from src.classes.database import Database
 from src.classes.message.Message import CustomMessage as Message
 from src.utils import Utils
-import tracemalloc
-from concurrent.futures import ProcessPoolExecutor
 
 ClientVar = TypeVar("ClientVar")
 
@@ -89,9 +85,9 @@ class CustomClient(Client):
             method = getattr(self, name)
             if inspect.iscoroutinefunction(method):
                 commands = name[7:].split("_")
+                handler = self._wrap_handler(method, commands)
                 if "admin" in commands:
                     commands.remove("admin")
-                handler = self._wrap_handler(method, commands)
                 self.add_handler(MessageHandler(handler, filters.command(commands)))
 
     def _setup_callbacks(self):
@@ -103,15 +99,13 @@ class CustomClient(Client):
         self, handler: Callable[..., Awaitable[Message]], commands: list[str]
     ) -> Callable[..., Awaitable[Message]]:
         """Обертка для обработчиков с проверкой прав"""
+        
         if "admin" in commands:
             original_handler = handler
 
-            async def admin_handler(client: Client, message: Message) -> Message:
+            async def admin_handler(client: Client, message: Message) -> Message | None:
                 if message.from_user and message.from_user.id in Utils.ADMIN_IDS:
                     return await original_handler(client, message)
-                else:
-                    await message.reply("Unauthorized")
-                    return message
 
             handler = admin_handler
         return self._error_handler_wrapper(handler)
@@ -124,6 +118,7 @@ class CustomClient(Client):
         async def wrapper(client: Client, message: Message) -> Callable[..., Message]:
             try:
                 return await func(client, message)
+                
             except Exception as e:
                 await self._report_error(e, func.__name__)
 
@@ -137,7 +132,7 @@ class CustomClient(Client):
             f"**Описание:** `{str(error)}`\n\n"
             f"```python {traceback.format_exc()[:3000]}\n```"
         )
-
+        
         for admin_id in Utils.ADMIN_IDS:
             try:
                 await self.send_message(admin_id, error_msg)
@@ -200,7 +195,7 @@ class CustomClient(Client):
                 ),
             )
 
-    async def handle_check_admin(self, message: Message):
+    async def handle_check_admin(self, _, message: Message):
         """Проверка регистрации по хэш-коду (админ)"""
         if hash_code := message.command[1]:
             visitor = self.db.check_registration_by_hash(hash_code)
@@ -211,7 +206,7 @@ class CustomClient(Client):
             else:
                 await message.reply(Utils.FALSE_CODE)
 
-    async def handle_sendall_admin(self, message: Message):
+    async def handle_sendall_admin(self, _, message: Message):
         """Рассылка сообщений (админ)"""
         answer = await message.ask("Введите текст рассылки или 'выход' для отмены")
         if answer.text.lower() != "выход":

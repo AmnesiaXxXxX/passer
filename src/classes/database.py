@@ -61,7 +61,7 @@ class Database:
         while True:
             time.sleep(self.dump_interval)
             with self.get_session() as session:
-                session.query(Visitor).filter(Visitor.is_active == True).delete()
+                session.query(Visitor).filter(Visitor.is_active).delete()
             self._create_backup()
 
     def _create_backup(self):
@@ -276,7 +276,7 @@ class Database:
                     session.query(func.count(Visitor.id))
                     .filter(
                         Visitor.to_datetime == visitor.to_datetime,
-                        Visitor.is_active == True,
+                        Visitor.is_active,
                     )
                     .scalar()
                 )
@@ -330,7 +330,7 @@ class Database:
             query = session.query(Visitor)
             visitors = len(
                 query.filter(
-                    Visitor.to_datetime == date, Visitor.is_active == True
+                    Visitor.to_datetime == date, Visitor.is_active
                 ).all()
             )
 
