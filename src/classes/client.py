@@ -144,14 +144,6 @@ class CustomClient(Client):
             except Exception as e:
                 self.logger.error(f"Ошибка отправки сообщения: {e}")
 
-    async def _process_message(self, client: Client, message: Message):
-        """Обработка сообщения из очереди"""
-        command = message.command[0]
-        method_name = f"handle_{command}"
-
-        if hasattr(self, method_name):
-            await getattr(self, method_name)(client, message)
-
     # async def handle_genqrtest_admin(self, _, message: Message):
     #     """Генерация n QR-кодов одновременно с измерением памяти"""
     #     args = message.command[1:]
@@ -343,10 +335,12 @@ class CustomClient(Client):
             str(query.data).rsplit("_", maxsplit=1)[-1], Utils.DATE_FORMAT
         ).date()
 
-        if self.db.check_registration_by_tgid(query.from_user.id, to_datetime):
+        if self.db.check_registration_by_tgid(query.from_user.id, to_datetime, True):
             await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
             return
-
+        if self.db.check_registration_by_tgid(query.from_user.id, to_datetime, False):
+            self.db.delete_visitor(query.from_user.id, to_datetime)
+            self.logger.info("Неактивный хеш уже существует! Удаление для пересоздания")
         if self.db.is_event_full(to_datetime):
             await query.answer("❌ Нет свободных мест!")
             return

@@ -104,7 +104,6 @@ class ButtonsMenu:
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton(f"Оплатить {cost} ₽", url=payment_url)],
-                [cls._get_menu_button()],
             ]
         )
 
