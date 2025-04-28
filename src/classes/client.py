@@ -202,7 +202,7 @@ class CustomClient(Client):
             if visitor:
                 if bool(visitor.is_active):
                     await message.reply(Utils.TRUE_CODE)
-                    self.db.disable_visitor(hash_code)
+                    self.db.use_hash(hash_code)
             else:
                 await message.reply(Utils.FALSE_CODE)
 
@@ -272,8 +272,11 @@ class CustomClient(Client):
             else:
                 if message.from_user.id in Utils.ADMIN_IDS:
                     if self.db.check_registration_by_hash(hash_code):
-                        self.db.disable_visitor(hash_code)
-                        await message.reply(Utils.TRUE_CODE)
+                        try:
+                            self.db.use_hash(hash_code)
+                            await message.reply(Utils.TRUE_CODE)
+                        except ValueError:
+                            await message.reply(Utils.FALSE_CODE_ALREADY_USED)
                     else:
                         await message.reply(Utils.FALSE_CODE)
                     return

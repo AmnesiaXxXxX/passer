@@ -25,7 +25,8 @@ class Visitor(Base):
     tg_id = Column(String, nullable=False)
     to_datetime = Column(Date, nullable=False)
     hash_code = Column(String, nullable=False, unique=True)
-    is_active: bool | Column[bool] = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True)
+    is_used = Column(Boolean, default=False)
 
 
 class User(Base):
@@ -134,6 +135,24 @@ class Database:
                 session.rollback()
                 self.logger.error(f"Ошибка добавления пользователя: {e}")
                 return False
+
+    def use_hash(self, hash_code: str) -> bool:
+        with self.get_session() as session:
+            visitor = (
+                session.query(Visitor)
+                .filter(Visitor.hash_code == hash_code, Visitor.is_active.is_(True))
+                .first()
+            )
+
+            if visitor:
+                if bool(visitor.is_active) and not bool(visitor.is_used):
+                    visitor.is_used = True
+                    session.add(visitor)
+                    session.commit()
+                else:
+                    raise ValueError("Хеш уже был использован")
+        
+            return bool(visitor.is_used) if visitor else False
 
     @overload
     def enable_visitor(
@@ -329,9 +348,7 @@ class Database:
                 max_visitors = 230
             query = session.query(Visitor)
             visitors = len(
-                query.filter(
-                    Visitor.to_datetime == date, Visitor.is_active
-                ).all()
+                query.filter(Visitor.to_datetime == date, Visitor.is_active).all()
             )
 
             return int(max_visitors - visitors)
