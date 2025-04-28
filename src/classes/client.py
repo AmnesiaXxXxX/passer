@@ -5,6 +5,7 @@ import inspect
 import io
 import logging
 import os
+import sqlite3
 import time
 import traceback
 from typing import Any, Awaitable, Callable, Optional, TypeVar
@@ -13,7 +14,7 @@ from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers import CallbackQueryHandler, MessageHandler
 from pyrogram.types import CallbackQuery, User
-
+from pyrogram.errors.exceptions.forbidden_403 import MessageDeleteForbidden
 from src.classes.buttons_menu import ButtonsMenu
 from src.classes.customtinkoffacquiringapclient import CustomTinkoffAcquiringAPIClient
 from src.classes.database import Database
@@ -99,7 +100,7 @@ class CustomClient(Client):
         self, handler: Callable[..., Awaitable[Message]], commands: list[str]
     ) -> Callable[..., Awaitable[Message]]:
         """Обертка для обработчиков с проверкой прав"""
-        
+
         if "admin" in commands:
             original_handler = handler
 
@@ -118,7 +119,7 @@ class CustomClient(Client):
         async def wrapper(client: Client, message: Message) -> Callable[..., Message]:
             try:
                 return await func(client, message)
-                
+
             except Exception as e:
                 await self._report_error(e, func.__name__)
 
@@ -132,7 +133,7 @@ class CustomClient(Client):
             f"**Описание:** `{str(error)}`\n\n"
             f"```python {traceback.format_exc()[:3000]}\n```"
         )
-        
+
         for admin_id in Utils.ADMIN_IDS:
             try:
                 await self.send_message(admin_id, error_msg)
@@ -368,7 +369,20 @@ class CustomClient(Client):
         )
 
         if await self.tb.await_payment(payment["PaymentId"]):
-            self.db.enable_visitor(hash_code=hash_code)
+            try:
+                for i in range(5):
+                    msg_id = message.id - i
+                    try:
+                        await self.delete_messages(message.chat.id, [msg_id])
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+                self.db.enable_visitor(hash_code=hash_code)
+            except MessageDeleteForbidden:
+                pass
+            except sqlite3.Error:
+                hash_code = self.db.enable_visitor(
+                    tg_id=query.from_user.id, to_datetime=to_datetime
+                )
             msg = await message.reply("Подождите, идёт генерация вашего куаркода")
             qr_image = await Utils.gen_qr_code(
                 Utils.QR_URL(self.me.username if self.me else "", hash_code)
