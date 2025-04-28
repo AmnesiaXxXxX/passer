@@ -7,6 +7,7 @@ from pathlib import Path
 
 def setup_logging():
     """Метод для настройки логгера+"""
+    logging.info("Настройка логгирования приложения")
     # Создаем папку logs, если ее нет
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)

@@ -59,6 +59,7 @@ class Database:
 
     def _backup_scheduler(self):
         """Планировщик создания резервных копий"""
+        self.logger.info("Запуск планировщика резервного копирования")
         while True:
             time.sleep(self.dump_interval)
             with self.get_session() as session:
@@ -79,6 +80,7 @@ class Database:
             self.logger.info(f"Ошибка при создании бэкапа: {e}")
 
     def _rotate_backups(self, max_backups: int = 10):
+        """Удаляет старые резервные копии, если их больше max_backups"""
         backups = sorted(glob.glob(f"{self.backup_dir}/*.bak"))
         if len(backups) > max_backups:
             for old_backup in backups[:-max_backups]:
@@ -95,7 +97,8 @@ class Database:
         return self.Session()
 
     def get_all_visitors(self, q: Optional[str | int] = None) -> List[Visitor]:
-        """Возвращает всех посетителей с возможностью фильтрации"""
+        """Возвращает всех посетителей с возможностью фильтрации по tg_id или hash_code"""
+        self.logger.info(f"Получение всех посетителей, фильтр: {q}")
         with self.get_session() as session:
             query = session.query(Visitor)
             if q:
@@ -105,6 +108,8 @@ class Database:
             return query.all()
 
     def get_user_hashcode(self, tg_id: str | int, to_datetime: date | datetime) -> str:
+        """Получает hash_code пользователя по tg_id и дате события"""
+        self.logger.info(f"Получение hash_code для пользователя {tg_id} на {to_datetime}")
         with self.get_session() as session:
             query = session.query(Visitor).filter(
                 Visitor.tg_id == tg_id, Visitor.to_datetime == to_datetime
@@ -117,11 +122,13 @@ class Database:
 
     def get_all_users(self) -> List[User]:
         """Возвращает всех пользователей"""
+        self.logger.info("Получение всех пользователей")
         with self.get_session() as session:
             return session.query(User).all()
 
     def add_user(self, tg_id: str | int) -> bool:
-        """Добавляет нового пользователя"""
+        """Добавляет нового пользователя по tg_id"""
+        self.logger.info(f"Добавление пользователя {tg_id}")
         with self.get_session() as session:
             if session.query(User).filter(User.tg_id == tg_id).first():
                 return False
@@ -137,6 +144,8 @@ class Database:
                 return False
 
     def use_hash(self, hash_code: str) -> bool:
+        """Помечает hash_code как использованный"""
+        self.logger.info(f"Использование hash_code: {hash_code}")
         with self.get_session() as session:
             visitor = (
                 session.query(Visitor)
@@ -175,6 +184,8 @@ class Database:
         to_datetime: Optional[datetime | date] = None,
         hash_code: Optional[str] = None,
     ) -> str:
+        """Активирует посетителя по tg_id и дате или по hash_code"""
+        self.logger.info(f"Активируем посетителя: tg_id={tg_id}, to_datetime={to_datetime}, hash_code={hash_code}")
         visitor: Optional[Visitor] = None
         with self.get_session() as session:
             if hash_code:
@@ -201,7 +212,8 @@ class Database:
     def reg_new_visitor(
         self, tg_id: str | int, to_datetime: datetime, is_active: bool = True
     ) -> str:
-        """Регистрирует нового посетителя"""
+        """Регистрирует нового посетителя на событие"""
+        self.logger.info(f"Регистрация нового посетителя: tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}")
         with self.get_session() as session:
             event_date = to_datetime.date()
 
@@ -248,7 +260,8 @@ class Database:
                 raise
 
     def delete_visitor(self, tg_id: str | int, to_datetime: Optional[date] = None):
-        """Удаляет посетителя"""
+        """Удаляет посетителя по tg_id и (опционально) дате события"""
+        self.logger.info(f"Удаление посетителя: tg_id={tg_id}, to_datetime={to_datetime}")
         with self.get_session() as session:
             query = session.query(Visitor).filter(Visitor.tg_id == tg_id)
             if to_datetime:
@@ -274,7 +287,8 @@ class Database:
                 raise
 
     def disable_visitor(self, hash_code: str) -> bool:
-        """Деактивирует посетителя"""
+        """Деактивирует посетителя по hash_code"""
+        self.logger.info(f"Деактивация посетителя с hash_code={hash_code}")
         with self.get_session() as session:
             visitor = (
                 session.query(Visitor).filter(Visitor.hash_code == hash_code).first()
@@ -312,7 +326,8 @@ class Database:
     def check_registration_by_hash(
         self, hash_code: str, is_strict: bool = True
     ) -> Optional[Visitor]:
-        """Проверяет регистрацию по хэшу"""
+        """Проверяет регистрацию по хэшу (строгое/нестрогое совпадение)"""
+        self.logger.info(f"Проверка регистрации по hash_code={hash_code}, is_strict={is_strict}")
         with self.get_session() as session:
             query = session.query(Visitor)
             if is_strict:
@@ -324,7 +339,8 @@ class Database:
     def check_registration_by_tgid(
         self, tg_id: str | int, to_datetime: date, is_active: bool = True
     ) -> bool:
-        """Проверяет регистрацию по TG ID"""
+        """Проверяет регистрацию по TG ID и дате события"""
+        self.logger.info(f"Проверка регистрации по tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}")
         with self.get_session() as session:
             return (
                 session.query(Visitor)
@@ -338,6 +354,8 @@ class Database:
             )
 
     def get_available(self, date: str | date | Column[date]) -> int:
+        """Возвращает количество доступных мест на событие"""
+        self.logger.info(f"Получение количества доступных мест на дату {date}")
         with self.get_session() as session:
             query = (
                 session.query(Registration).filter(Registration.date == date).first()
@@ -356,7 +374,8 @@ class Database:
     def get_events(
         self, show_all: bool = False, show_old: bool = True
     ) -> List[Registration]:
-        """Возвращает список событий"""
+        """Возвращает список событий (опционально: все/только новые/только с местами)"""
+        self.logger.info(f"Получение событий: show_all={show_all}, show_old={show_old}")
         with self.get_session() as session:
             query = session.query(Registration)
 
@@ -369,7 +388,8 @@ class Database:
             return query.order_by(Registration.date).all()
 
     def is_event_full(self, to_datetime: date) -> bool:
-        """Проверяет заполнено ли событие"""
+        """Проверяет заполнено ли событие на дату"""
+        self.logger.info(f"Проверка заполненности события на дату {to_datetime}")
         with self.get_session() as session:
             registration = (
                 session.query(Registration)
@@ -382,7 +402,8 @@ class Database:
                 return True
 
     def add_event(self, to_datetime: date, max_visitors: int):
-        """Добавляет или обновляет событие"""
+        """Добавляет или обновляет событие с максимальным числом участников"""
+        self.logger.info(f"Добавление/обновление события: дата={to_datetime}, макс. участников={max_visitors}")
         with self.get_session() as session:
             registration = (
                 session.query(Registration)
@@ -402,7 +423,8 @@ class Database:
                 raise
 
     def delete_event(self, to_datetime: date):
-        """Удаляет событие"""
+        """Удаляет событие и всех связанных посетителей по дате"""
+        self.logger.info(f"Удаление события на дату {to_datetime}")
         with self.get_session() as session:
             session.query(Visitor).filter(Visitor.to_datetime == to_datetime).delete()
 

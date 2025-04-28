@@ -22,7 +22,7 @@ T = TypeVar("T")
 
 
 def get_env_admin_ids() -> list[int | str]:
-    """Получаем значение из переменной окружения или используем значение по умолчанию"""
+    """Получает список ID администраторов из переменной окружения ADMIN_IDS"""
     load_dotenv(override=True)
     ids_str = os.getenv("ADMIN_IDS", "5957115070,831985431")
     return [
@@ -49,7 +49,7 @@ class Utils:
 
     @staticmethod
     def generate_hash(tg_id: int | str, dt: datetime) -> str:
-        """Внутренняя функция генерация хеша"""
+        """Генерирует SHA256-хеш из tg_id и даты"""
         data = f"{tg_id}{dt.isoformat()}"
         return hashlib.sha256(data.encode()).hexdigest()
 
@@ -95,7 +95,9 @@ class Utils:
     def create_qr(
         data: Union[str, list[str]], style: Optional[str] = None
     ) -> Image.Image:
-        """Генерация QR-кода с использованием изображения в качестве цветовой маски.
+        """Генерирует QR-код с заданным стилем
+
+        Генерация QR-кода с использованием изображения в качестве цветовой маски.
 
         Если передан дополнительный параметр style, применяется альтернативное оформление.
 
@@ -144,7 +146,7 @@ class Utils:
 
     @classmethod
     async def gen_qr_code(cls, data: str | list[str], style: Optional[str] = None):
-        """Асинхронная генерация QR-кода через мультипроцессорное исполнение.
+        """Асинхронная генерация QR-кода через мультипроцессорное исполнение
 
         Args:
             data (str | list[str]): Данные для генерации QR-кода. Если передается список,

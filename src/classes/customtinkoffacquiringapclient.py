@@ -10,6 +10,7 @@ class CustomTinkoffAcquiringAPIClient(TinkoffAcquiringAPIClient):
     """Класс кастомного класса клиента тинькоффа"""
 
     def __init__(self, terminal_key: str | None, secret: str | None):
+        """Инициализация кастомного клиента Тинькофф"""
         if not (terminal_key or secret):
             raise ValueError("terminal_key и secret не могут быть пустыми")
         super().__init__(terminal_key, secret)

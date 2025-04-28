@@ -74,7 +74,7 @@ class ButtonsMenu:
 
     @staticmethod
     def get_newsletter_markup(tg_id: Union[int, str]) -> InlineKeyboardMarkup:
-        """Клавиатура для подтверждения рассылки"""
+        """Генерирует клавиатуру для подтверждения рассылки"""
         return InlineKeyboardMarkup(
             [
                 [
@@ -86,7 +86,7 @@ class ButtonsMenu:
 
     @staticmethod
     def get_start_markup() -> InlineKeyboardMarkup:
-        """Стартовая клавиатура"""
+        """Генерирует стартовую клавиатуру"""
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Купить билеты", callback_data="buytickets")],
@@ -100,7 +100,7 @@ class ButtonsMenu:
 
     @classmethod
     def get_payment_markup(cls, payment_url: str, cost: int) -> InlineKeyboardMarkup:
-        """Клавиатура для оплаты"""
+        """Генерирует клавиатуру для оплаты"""
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton(f"Оплатить {cost} ₽", url=payment_url)],
@@ -109,10 +109,10 @@ class ButtonsMenu:
 
     @staticmethod
     def _get_menu_button() -> InlineKeyboardButton:
-        """Кнопка возврата в меню"""
+        """Возвращает кнопку возврата в меню"""
         return InlineKeyboardButton("🗄 В меню", callback_data="menu")
 
     @staticmethod
     def get_menu_markup() -> InlineKeyboardMarkup:
-        """Минимальная клавиатура с кнопкой меню"""
+        """Генерирует минимальную клавиатуру с кнопкой меню"""
         return InlineKeyboardMarkup([[ButtonsMenu._get_menu_button()]])
