@@ -247,7 +247,7 @@ class CustomClient(Client):
 
     async def handle_main_start(self, _: Client, message: Message):
         """Обработка команд /main и /start"""
-        self.db.add_user(message.from_user.id)
+        self.db.add_user(message.from_user)
         if len(message.command) > 1:
             hash_code = message.command[1]
             if hash_code.startswith("activate"):

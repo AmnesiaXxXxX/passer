@@ -9,7 +9,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional, overload
-
+from pyrogram.types import User as TGUser
 from sqlalchemy import Boolean, Column, Date, Integer, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
@@ -33,6 +33,9 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     tg_id = Column(String, nullable=False, unique=True)
+    username = Column(String, nullable=True)
+    first_name = Column(String, nullable=False)
+    full_name = Column(String, nullable=False)
 
 
 class Registration(Base):
@@ -109,7 +112,9 @@ class Database:
 
     def get_user_hashcode(self, tg_id: str | int, to_datetime: date | datetime) -> str:
         """Получает hash_code пользователя по tg_id и дате события"""
-        self.logger.info(f"Получение hash_code для пользователя {tg_id} на {to_datetime}")
+        self.logger.info(
+            f"Получение hash_code для пользователя {tg_id} на {to_datetime}"
+        )
         with self.get_session() as session:
             query = session.query(Visitor).filter(
                 Visitor.tg_id == tg_id, Visitor.to_datetime == to_datetime
@@ -126,13 +131,19 @@ class Database:
         with self.get_session() as session:
             return session.query(User).all()
 
-    def add_user(self, tg_id: str | int) -> bool:
+    def add_user(self, user: TGUser) -> bool:
+        tg_id = user.id
         """Добавляет нового пользователя по tg_id"""
         self.logger.info(f"Добавление пользователя {tg_id}")
         with self.get_session() as session:
             if session.query(User).filter(User.tg_id == tg_id).first():
                 return False
-            user = User(tg_id=tg_id)
+            user = User(
+                tg_id=tg_id,
+                username=user.username,
+                first_name=user.first_name,
+                full_name=user.full_name,
+            )
             session.add(user)
             try:
                 session.commit()
@@ -160,7 +171,7 @@ class Database:
                     session.commit()
                 else:
                     raise ValueError("Хеш уже был использован")
-        
+
             return bool(visitor.is_used) if visitor else False
 
     @overload
@@ -185,7 +196,9 @@ class Database:
         hash_code: Optional[str] = None,
     ) -> str:
         """Активирует посетителя по tg_id и дате или по hash_code"""
-        self.logger.info(f"Активируем посетителя: tg_id={tg_id}, to_datetime={to_datetime}, hash_code={hash_code}")
+        self.logger.info(
+            f"Активируем посетителя: tg_id={tg_id}, to_datetime={to_datetime}, hash_code={hash_code}"
+        )
         visitor: Optional[Visitor] = None
         with self.get_session() as session:
             if hash_code:
@@ -213,7 +226,9 @@ class Database:
         self, tg_id: str | int, to_datetime: datetime, is_active: bool = True
     ) -> str:
         """Регистрирует нового посетителя на событие"""
-        self.logger.info(f"Регистрация нового посетителя: tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}")
+        self.logger.info(
+            f"Регистрация нового посетителя: tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}"
+        )
         with self.get_session() as session:
             event_date = to_datetime.date()
 
@@ -261,7 +276,9 @@ class Database:
 
     def delete_visitor(self, tg_id: str | int, to_datetime: Optional[date] = None):
         """Удаляет посетителя по tg_id и (опционально) дате события"""
-        self.logger.info(f"Удаление посетителя: tg_id={tg_id}, to_datetime={to_datetime}")
+        self.logger.info(
+            f"Удаление посетителя: tg_id={tg_id}, to_datetime={to_datetime}"
+        )
         with self.get_session() as session:
             query = session.query(Visitor).filter(Visitor.tg_id == tg_id)
             if to_datetime:
@@ -327,7 +344,9 @@ class Database:
         self, hash_code: str, is_strict: bool = True
     ) -> Optional[Visitor]:
         """Проверяет регистрацию по хэшу (строгое/нестрогое совпадение)"""
-        self.logger.info(f"Проверка регистрации по hash_code={hash_code}, is_strict={is_strict}")
+        self.logger.info(
+            f"Проверка регистрации по hash_code={hash_code}, is_strict={is_strict}"
+        )
         with self.get_session() as session:
             query = session.query(Visitor)
             if is_strict:
@@ -340,7 +359,9 @@ class Database:
         self, tg_id: str | int, to_datetime: date, is_active: bool = True
     ) -> bool:
         """Проверяет регистрацию по TG ID и дате события"""
-        self.logger.info(f"Проверка регистрации по tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}")
+        self.logger.info(
+            f"Проверка регистрации по tg_id={tg_id}, to_datetime={to_datetime}, is_active={is_active}"
+        )
         with self.get_session() as session:
             return (
                 session.query(Visitor)
@@ -403,7 +424,9 @@ class Database:
 
     def add_event(self, to_datetime: date, max_visitors: int):
         """Добавляет или обновляет событие с максимальным числом участников"""
-        self.logger.info(f"Добавление/обновление события: дата={to_datetime}, макс. участников={max_visitors}")
+        self.logger.info(
+            f"Добавление/обновление события: дата={to_datetime}, макс. участников={max_visitors}"
+        )
         with self.get_session() as session:
             registration = (
                 session.query(Registration)
