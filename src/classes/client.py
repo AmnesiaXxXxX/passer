@@ -354,7 +354,7 @@ class CustomClient(Client):
             return
         event = self.db.get_event(to_datetime)
         payment = await self.tb.init_payment(
-            event,
+            event.cost,
             f"{query.from_user.id}_{to_datetime}_{time.time()}",
             "Оплата входа на мероприятие",
             success_url=Utils.SUCCESS_URL(
