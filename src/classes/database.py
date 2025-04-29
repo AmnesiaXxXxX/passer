@@ -35,7 +35,7 @@ class User(Base):
     tg_id = Column(String, nullable=False, unique=True)
     username = Column(String, nullable=True)
     first_name = Column(String, nullable=False)
-    full_name = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
 
 
 class Registration(Base):
@@ -44,6 +44,7 @@ class Registration(Base):
     date = Column(Date, nullable=False, unique=True)
     max_visitors: int | Column[int] = Column(Integer, nullable=False)
     visitors_count: int | Column[int] = Column(Integer, default=0)
+    cost: int | Column[int] = Column(Integer, default=250)
 
 
 class Database:
@@ -444,6 +445,25 @@ class Database:
                 session.rollback()
                 self.logger.error(f"Ошибка добавления события: {e}")
                 raise
+
+    def get_event(self, to_datetime: date | str):
+        self.logger.info(f"Получение информации о событии на дату {to_datetime}")
+        # Если передана строка, пытаемся преобразовать её в дату
+        if isinstance(to_datetime, str):
+            try:
+                to_datetime = datetime.strptime(to_datetime, "%Y-%m-%d").date()
+            except ValueError as e:
+                self.logger.error(f"Неверный формат даты: {e}")
+                raise ValueError("Дата должна быть в формате ГГГГ-ММ-ДД")
+        with self.get_session() as session:
+            event = (
+                session.query(Registration)
+                .filter(Registration.date == to_datetime)
+                .first()
+            )
+            if event is None:
+                self.logger.info(f"Событие на дату {to_datetime} не найдено")
+            return event
 
     def delete_event(self, to_datetime: date):
         """Удаляет событие и всех связанных посетителей по дате"""

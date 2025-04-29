@@ -364,7 +364,7 @@ class CustomClient(Client):
         await message.edit_text(
             "Выберите способ оплаты:",
             reply_markup=ButtonsMenu.get_payment_markup(
-                payment["PaymentURL"], Utils.COST
+                payment["PaymentURL"], self.db.get_event(to_datetime).cost
             ),
         )
 
