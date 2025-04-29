@@ -45,7 +45,7 @@ class Utils:
     CALLBACK_USER_ALREADY_REGISTRATE = "❌ Вы уже были зарегистрированы!"
     CALLBACK_USER_NOT_AVAILABLE = "❌ Места на это событие кончились!"
     QR_URL = "https://t.me/{0}?start={1}".format
-    COST = 250
+    COST = int(os.getenv("COST", 250))
 
     @staticmethod
     def generate_hash(tg_id: int | str, dt: datetime) -> str:
@@ -138,7 +138,7 @@ class Utils:
                     image_factory=StyledPilImage,
                     module_drawer=RoundedModuleDrawer(),
                     color_mask=ImageColorMask(
-                        (89, 88, 86), color_mask_path="image.png"
+                        (128, 128, 128), color_mask_path="image.png"
                     ),
                 )
 
