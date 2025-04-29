@@ -132,8 +132,8 @@ class Database:
             return session.query(User).all()
 
     def add_user(self, user: TGUser) -> bool:
-        tg_id = user.id
         """Добавляет нового пользователя по tg_id"""
+        tg_id = user.id
         self.logger.info(f"Добавление пользователя {tg_id}")
         with self.get_session() as session:
             if session.query(User).filter(User.tg_id == tg_id).first():
