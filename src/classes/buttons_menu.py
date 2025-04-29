@@ -101,10 +101,10 @@ class ButtonsMenu:
         )
 
     @classmethod
-    def get_payment_markup(cls, payment_url: str, cost: int) -> InlineKeyboardMarkup:
-        load_dotenv(override=True)
-        cost = int(os.getenv("COST", cost))
+    def get_payment_markup(cls, payment_url: str, cost: int | str) -> InlineKeyboardMarkup:
         """Генерирует клавиатуру для оплаты"""
+        load_dotenv(override=True)
+        cost = os.getenv("COST", cost)
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton(f"Оплатить {cost} ₽", url=payment_url)],
