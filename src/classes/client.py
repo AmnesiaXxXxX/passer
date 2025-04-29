@@ -352,19 +352,19 @@ class CustomClient(Client):
         except AttributeError:
             await query.answer(Utils.CALLBACK_USER_ALREADY_REGISTRATE)
             return
+        event = self.db.get_event(to_datetime)
         payment = await self.tb.init_payment(
-            Utils.COST,
+            event,
             f"{query.from_user.id}_{to_datetime}_{time.time()}",
             "Оплата входа на мероприятие",
             success_url=Utils.SUCCESS_URL(
                 self.me.username if self.me else "", hash_code[:5]
             ),
         )
-
         await message.edit_text(
             "Выберите способ оплаты:",
             reply_markup=ButtonsMenu.get_payment_markup(
-                payment["PaymentURL"], self.db.get_event(to_datetime).cost
+                payment["PaymentURL"], event.cost
             ),
         )
 
