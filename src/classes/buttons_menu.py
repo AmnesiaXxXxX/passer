@@ -1,13 +1,12 @@
 """Модуль кнопок меню с использованием SQLAlchemy"""
 
+import os
 from datetime import datetime
-from typing import Union, List
+from typing import List, Union
 
-from pyrogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InlineKeyboardButtonBuy,
-)
+from dotenv import load_dotenv
+from pyrogram.types import (InlineKeyboardButton, InlineKeyboardButtonBuy,
+                            InlineKeyboardMarkup)
 
 from src.classes.database import Database
 from src.utils import Utils
@@ -100,7 +99,10 @@ class ButtonsMenu:
 
     @classmethod
     def get_payment_markup(cls, payment_url: str, cost: int) -> InlineKeyboardMarkup:
-        """Клавиатура для оплаты"""
+        """Генерирует клавиатуру для оплаты"""
+        load_dotenv(override=True)
+        cost = int(os.getenv("COST", cost))
+        print(f"COST from .env: {os.getenv('COST')}")
         return InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton(f"Оплатить {cost} ₽", url=payment_url)],
